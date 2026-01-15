@@ -1,0 +1,8 @@
+Drivers/
+Debug/
+.cproject
+.mxproject
+.project
+.settings/
+GPS_IMU_Drivers Debug.launch
+

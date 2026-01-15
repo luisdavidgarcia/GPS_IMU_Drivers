@@ -12,6 +12,11 @@
 // Main Cpp event loop to run application
 void app_main_CPP(I2C_HandleTypeDef* hi2c1) {
 	IMU imu{hi2c1};
+
+	while (1)
+	{
+		imu.Read();
+	}
 }
 
 // Define all C function calls from main.c below

@@ -7,16 +7,6 @@
  * designed for a specific IMU sensor and may require configuration adjustments for
  * different hardware or use cases.
  *
- * CREDIT/CODE MODIFIED FROM:
- * https://github.com/GoScoutOrg/Rover/blob/749a7758aef85ed877ad6db56e223f91a708abdf/src/rover/imu.py
- *
- * Dependencies:
- * - i2c/smbus.h, linux/i2c-dev.h, linux/i2c.h: Required for I2C communication.
- * - cstdint, sys/ioctl.h, time.h: Standard C++ libraries.
- *
- * Constants and Definitions:
- * - Various constants for I2C addresses, register addresses, data sizes, and sensitivities.
- *
  * Class:
  * - Imu: A class that encapsulates IMU functionality, including I2C communication,
  *   sensor data retrieval, and telemetry functions.
@@ -33,10 +23,11 @@
 #ifndef IMU_HPP
 #define IMU_HPP
 
-extern "C"
-{
+extern "C" {
 #include "stm32l4xx_hal.h"
 }
+
+#include "mpu9250_register_map.hpp"
 
 #include <sys/cdefs.h>
 #include <cstdint>
@@ -61,137 +52,73 @@ constexpr int Z_AXIS = 2;
 constexpr int BITS_PER_BYTE = 8;
 constexpr int BYTE_MASK = 0xFF;
 constexpr float ACCEL_SCALE = 0.3F;
+constexpr uint8_t BYTE = 1;
 
 /** I2C Specifics */
 constexpr uint16_t IMU_I2C_ADDRESS = 0x68;
-constexpr const char* IMU_I2C_BUS = "/dev/i2c-1";
-constexpr uint8_t IMU_ID = 0xEA;
+constexpr uint16_t AK8963_ADDRESS = 0x0C;
+constexpr uint16_t DEFAULT_TIMEOUT = 1000;
 
-/** General Registers */
-constexpr uint8_t BANK_SEL = 0x7F;
-constexpr uint8_t BANK_REG_0 = 0x00;
-constexpr uint8_t BANK_REG_1 = 0x10;
-constexpr uint8_t BANK_REG_2 = 0x20;
-constexpr uint8_t BANK_REG_3 = 0x30;
-
-/** Bank 0 Registers */
-constexpr uint8_t WHO_AM_I = 0x00;
-constexpr uint8_t PWR_MGMT_1 = 0x06;
-constexpr uint8_t INT_PIN_CFG = 0x0F;
-
-/** Bank 3 Registers */
-constexpr uint8_t I2C_MST_CTRL = 0x01;
-constexpr uint8_t I2C_SLV0_ADDR = 0x03;
-constexpr uint8_t I2C_SLV0_REG = 0x04;
-constexpr uint8_t I2C_SLV0_CTRL = 0x05;
-constexpr uint8_t I2C_SLV4_ADDR = 0x13;
-constexpr uint8_t I2C_SLV4_REG = 0x14;
-constexpr uint8_t I2C_SLV4_CTRL = 0x15;
-constexpr uint8_t I2C_SLV4_DO = 0x16;
-
-/** Gyroscope Registers */
-constexpr uint8_t GYRO_REG_START = 0x00;
-constexpr uint8_t GYRO_CONFIG = 0x01;
-constexpr uint8_t GYRO_XOUT_H = 0x33;
-constexpr uint8_t GYRO_XOUT_L = 0x34;
-constexpr uint8_t GYRO_YOUT_H = 0x35;
-constexpr uint8_t GYRO_YOUT_L = 0x36;
-constexpr uint8_t GYRO_ZOUT_H = 0x37;
-constexpr uint8_t GYRO_ZOUT_L = 0x38;
-
-/** Accelerometer Registers */
-constexpr uint8_t ACCEL_REG_START = 0x00;
-constexpr uint8_t ACCEL_CONFIG = 0x01;
-constexpr uint8_t ACCEL_XOUT_H = 0x2D;
-constexpr uint8_t ACCEL_XOUT_L = 0x2E;
-constexpr uint8_t ACCEL_YOUT_H = 0x2F;
-constexpr uint8_t ACCEL_YOUT_L = 0x30;
-constexpr uint8_t ACCEL_ZOUT_H = 0x31;
-constexpr uint8_t ACCEL_ZOUT_L = 0x32;
-
-/** Magnetometer Registers */
-constexpr uint8_t MAGNETO_REG_START = 0x00;
-constexpr uint8_t MAGNETO_CONFIG = 0x01;
-constexpr uint8_t MAGNETO_XOUT_H = 0x3C;
-constexpr uint8_t MAGNETO_XOUT_L = 0x3D;
-constexpr uint8_t MAGNETO_YOUT_H = 0x3E;
-constexpr uint8_t MAGNETO_YOUT_L = 0x3F;
-constexpr uint8_t MAGNETO_ZOUT_H = 0x40;
-constexpr uint8_t MAGNETO_ZOUT_L = 0x41;
-
-/** Gyroscope sensitivity at 250dps */
-constexpr float GYRO_SENSITIVITY_250DPS = 1.0F / 131.0F;
 /** Gyroscope sensitivity at 500dps */
 constexpr float GYRO_SENSITIVITY_500DPS = 1.0F / 65.5F;
 constexpr size_t GYRO_DATA_SIZE = 6;
 constexpr uint8_t GYRO_CONFIG_VALUE = 0x11 << 1;
 
-/** Macro for mg per LSB at +/- 2g sensitivity (1 LSB = 0.000244mg) */
-constexpr float ACCEL_MG_LSB_2G = 1.0F / 16384.0F;
 /** Macro for mg per LSB at +/- 4g sensitivity (1 LSB = 0.000488mg) */
 constexpr float ACCEL_MG_LSB_4G = 1.0F / 8192.0F;
-/** Macro for mg per LSB at +/- 8g sensitivity (1 LSB = 0.000976mg) */
-constexpr float ACCEL_MG_LSB_8G = 1.0F / 4096.0F;
 
 /** Macro for micro tesla (uT) per LSB (1 LSB = 0.1uT) */
 constexpr float MAG_UT_LSB = 0.15F;
 constexpr float MAG_MAX_THRESHOLD = 5000.0F; // µT, adjust as needed
 
 /** Filter constants */
-constexpr float ALPHA 			   = 0.5F; // (range: 0-1)
+constexpr float ALPHA = 0.5F; // (range: 0-1)
 constexpr float ACCEL_X_OFFSET = -0.0567F;
 constexpr float ACCEL_Y_OFFSET = -0.0141F;
 constexpr float ACCEL_Z_OFFSET = -0.7006F;
-constexpr float GYRO_X_BIAS 	 = -0.00845F;
-constexpr float GYRO_Y_BIAS    = 0.00647F;
-constexpr float GYRO_Z_BIAS    = -0.00955F;
+constexpr float GYRO_X_BIAS = -0.00845F;
+constexpr float GYRO_Y_BIAS = 0.00647F;
+constexpr float GYRO_Z_BIAS = -0.00955F;
 
-struct alignas(8) AccelMPS2
-{
+struct AccelMPS2 {
 	int16_t x; // m/s^2
 	int16_t y; // m/s^2
 	int16_t z; // m/s^2
 };
 
-struct alignas(8) GyroRPS
-{
+struct GyroRPS {
 	int16_t x; // rad/s
 	int16_t y; // rad/s
 	int16_t z; // rad/s
 };
 
-struct alignas(8) MagUT
-{
+struct MagUT {
 	int16_t x; // µT
 	int16_t y; // µT
 	int16_t z; // µT
 };
 
-struct alignas(16) ScaledAccelMPS2
-{
+struct ScaledAccelMPS2 {
 	float x; // m/s^2
 	float y; // m/s^2
 	float z; // m/s^2
 };
 
-struct alignas(16) ScaledGyroRPS
-{
+struct ScaledGyroRPS {
 	float x; // rad/s
 	float y; // rad/s
 	float z; // rad/s
 };
 
-struct alignas(16) ScaledMagUT
-{
+struct ScaledMagUT {
 	float x; // µT
 	float y; // µT
 	float z; // µT
 };
 
-class IMU
-{
+class IMU {
 public:
-	explicit IMU(I2C_HandleTypeDef* hi2c);
+	explicit IMU(I2C_HandleTypeDef *hi2c);
 	~IMU() = default;
 
 	void Read();
@@ -207,41 +134,38 @@ public:
 	}
 
 	inline ScaledAccelMPS2 GetScaledAcceleration() const {
-		ScaledAccelMPS2 acceleration = {
-			static_cast<float>(accelerometer_.x) * ACCEL_MG_LSB_2G - ACCEL_X_OFFSET,
-			static_cast<float>(accelerometer_.y) * ACCEL_MG_LSB_2G - ACCEL_Y_OFFSET,
-			static_cast<float>(accelerometer_.z) * ACCEL_MG_LSB_2G - ACCEL_Z_OFFSET,
+		return {
+			static_cast<float>(accelerometer_.x) * ACCEL_MG_LSB_4G - ACCEL_X_OFFSET,
+			static_cast<float>(accelerometer_.y) * ACCEL_MG_LSB_4G - ACCEL_Y_OFFSET,
+			static_cast<float>(accelerometer_.z) * ACCEL_MG_LSB_4G - ACCEL_Z_OFFSET,
 		};
-
-		return acceleration;
 	}
 
 	inline ScaledGyroRPS GetScaledAngularVelocity() const {
-		ScaledGyroRPS angularVelocity = {
-			static_cast<float>(gyroscope_.x) * GYRO_SENSITIVITY_250DPS * DEG_TO_RAD - GYRO_X_BIAS,
-			static_cast<float>(gyroscope_.y) * GYRO_SENSITIVITY_250DPS * DEG_TO_RAD - GYRO_Y_BIAS,
-			static_cast<float>(gyroscope_.z) * GYRO_SENSITIVITY_250DPS * DEG_TO_RAD - GYRO_Z_BIAS,
+		return {
+			static_cast<float>(gyroscope_.x) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_X_BIAS,
+			static_cast<float>(gyroscope_.y) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_Y_BIAS,
+			static_cast<float>(gyroscope_.z) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_Z_BIAS,
 		};
-
-		return angularVelocity;
 	}
 
 	inline ScaledMagUT GetScaledMagneticField() const {
-		ScaledMagUT magneticField = {
+		return {
 			static_cast<float>(magnetometer_.x) * MAG_UT_LSB,
 			static_cast<float>(magnetometer_.y) * MAG_UT_LSB,
 			static_cast<float>(magnetometer_.z) * MAG_UT_LSB,
 		};
-
-		return magneticField;
 	}
 
 private:
-	I2C_HandleTypeDef* m_hi2c_;
-	AccelMPS2 accelerometer_{};
-	GyroRPS gyroscope_{};
-	MagUT magnetometer_{};
+	I2C_HandleTypeDef *m_hi2c_;
+	AccelMPS2 accelerometer_ { };
+	GyroRPS gyroscope_ { };
+	MagUT magnetometer_ { };
 	void begin() const;
+	void readAccelerometer();
+	void readGyroscope();
+	void readMagnetometer();
 };
 
 #endif // IMU_HPP

@@ -107,72 +107,47 @@ void IMU::Read() {
 }
 
 void IMU::readAccelerometer() {
-	/* Read accelerometer data */
-	uint8_t accel_x_h = 0;
-	HAL_I2C_Mem_Read(m_hi2c_,
-			IMU_I2C_ADDRESS << BYTE, ACCEL_XOUT_H, BYTE, &accel_x_h, BYTE,
-			DEFAULT_TIMEOUT);
-	uint8_t accel_x_l = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_XOUT_L,
-			BYTE, &accel_x_l, BYTE, DEFAULT_TIMEOUT);
-	uint8_t accel_y_h = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_YOUT_H,
-			BYTE, &accel_y_h, BYTE, DEFAULT_TIMEOUT);
-	uint8_t accel_y_l = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_YOUT_L,
-			BYTE, &accel_y_l, BYTE, DEFAULT_TIMEOUT);
-	uint8_t accel_z_h = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_ZOUT_H,
-			BYTE, &accel_z_h, BYTE, DEFAULT_TIMEOUT);
-	uint8_t accel_z_l = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_ZOUT_L,
-			BYTE, &accel_z_l, BYTE, DEFAULT_TIMEOUT);
+	/* Read accelerometer data (Big Endian Order) */
+	uint8_t raw_accel_data[6] = { 0, 0, 0, 0, 0, 0 };
+	HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, ACCEL_XOUT_H,
+			BYTE, raw_accel_data, 6, DEFAULT_TIMEOUT);
+	if (status == HAL_ERROR) {
+		return;
+	}
 
 	// Converting Raw Accel Data to Readable data
-	accelerometer_.x = static_cast<int16_t>((accel_x_h << BITS_PER_BYTE)
-			| (accel_x_l & BYTE_MASK));
-	accelerometer_.y = static_cast<int16_t>((accel_y_h << BITS_PER_BYTE)
-			| (accel_y_l & BYTE_MASK));
-	accelerometer_.z = static_cast<int16_t>((accel_z_h << BITS_PER_BYTE)
-			| (accel_z_l & BYTE_MASK));
+	accelerometer_.x = static_cast<int16_t>((raw_accel_data[0] << BITS_PER_BYTE)
+			| (raw_accel_data[1] & BYTE_MASK));
+	accelerometer_.y = static_cast<int16_t>((raw_accel_data[2] << BITS_PER_BYTE)
+			| (raw_accel_data[3] & BYTE_MASK));
+	accelerometer_.z = static_cast<int16_t>((raw_accel_data[4] << BITS_PER_BYTE)
+			| (raw_accel_data[5] & BYTE_MASK));
 }
 
 void IMU::readGyroscope() {
-	/* Read gyroscope data */
-	uint8_t gyro_x_h = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_XOUT_H,
-			BYTE, &gyro_x_h, BYTE, DEFAULT_TIMEOUT);
-	uint8_t gyro_x_l = 0;
-	HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_XOUT_L,
-			BYTE, &accel_x_l, BYTE, DEFAULT_TIMEOUT);
-	uint8_t gyro_y_h = 0;
-	status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_YOUT_H,
-			BYTE, &gyro_y_h, BYTE, DEFAULT_TIMEOUT);
-	uint8_t gyro_y_l = 0;
-	status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_YOUT_L,
-			BYTE, &gyro_y_l, BYTE, DEFAULT_TIMEOUT);
-	uint8_t gyro_z_h = 0;
-	status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_ZOUT_H,
-			BYTE, &gyro_z_h, BYTE, DEFAULT_TIMEOUT);
-	uint8_t gyro_z_l = 0;
-	status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_ZOUT_L,
-			BYTE, &gyro_z_l, BYTE, DEFAULT_TIMEOUT);
+	/* Read gyroscope data (Big Endian Order) */
+	uint8_t raw_gyro_data[6] = { 0, 0, 0, 0, 0, 0 };
+	HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_, IMU_I2C_ADDRESS << BYTE, GYRO_XOUT_H,
+			BYTE, raw_gyro_data, 6, DEFAULT_TIMEOUT);
+	if (status == HAL_ERROR) {
+		return;
+	}
 
 	// Converting Raw Gyro Data to Readable data
-	gyroscope_.x = static_cast<int16_t>((gyro_x_h << BITS_PER_BYTE)
-			| (gyro_x_l & BYTE_MASK));
-	gyroscope_.y = static_cast<int16_t>((gyro_y_h << BITS_PER_BYTE)
-			| (gyro_y_l & BYTE_MASK));
-	gyroscope_.z = static_cast<int16_t>((gyro_z_h << BITS_PER_BYTE)
-			| (gyro_z_l & BYTE_MASK));
+	gyroscope_.x = static_cast<int16_t>((raw_gyro_data[0] << BITS_PER_BYTE)
+			| (raw_gyro_data[1] & BYTE_MASK));
+	gyroscope_.y = static_cast<int16_t>((raw_gyro_data[2] << BITS_PER_BYTE)
+			| (raw_gyro_data[3] & BYTE_MASK));
+	gyroscope_.z = static_cast<int16_t>((raw_gyro_data[4] << BITS_PER_BYTE)
+			| (raw_gyro_data[5] & BYTE_MASK));
 }
 
 void IMU::readMagnetometer() {
-	/* Read magnetometer data one-burst and Little Endian Order */
+	/* Read magnetometer data one-burst (Little Endian Order) */
 	uint8_t st1 = 0;
-	status = HAL_I2C_Mem_Read(m_hi2c_, AK8963_ADDRESS << BYTE, AK8963_ST1, BYTE,
+	HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_, AK8963_ADDRESS << BYTE, AK8963_ST1, BYTE,
 			&st1, BYTE, DEFAULT_TIMEOUT);
-	if (!(st1 & AK8963_DATA_READY)) {
+	if ((status == HAL_ERROR) || !(st1 & AK8963_DATA_READY)) {
 		return;
 	}
 

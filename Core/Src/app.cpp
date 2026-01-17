@@ -4,10 +4,10 @@
  *      Author: Luis
  */
 
+#include <mpu9250_imu/mpu9250_imu.hpp>
 #include "app.hpp"
 
 // All C++ Includes must go here for C not to freak out
-#include "IMU/imu.hpp"
 
 // Main Cpp event loop to run application
 void app_main_CPP(I2C_HandleTypeDef* hi2c1) {

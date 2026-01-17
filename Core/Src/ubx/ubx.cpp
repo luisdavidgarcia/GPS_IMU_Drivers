@@ -91,7 +91,7 @@ std::string UBX::GetGNSSFixType(FixFlags fixFlag) const {
  * @brief   Calculate the checksum values (checksumA and checksumB) for a UBX message.
  */
 void UBX::ComputeChecksum() {
-	message_.checksumA = message_.msgClass;
+	message_.checksumA = static_cast<uint8_t>(message_.msgClass);
 	message_.checksumB = message_.checksumA;
 
 	message_.checksumA += message_.msgId;
@@ -121,7 +121,7 @@ void UBX::ResetPayload() {
  * @return  The string representation of the UBX message.
  */
 std::string UBX::UbxMessageToString() const {
-	std::string result = "Class : " + std::to_string(message_.msgClass) + "\n";
+	std::string result = "Class : " + MsgClassToString(message_.msgClass) + "\n";
 	result += "ID : " + std::to_string(message_.msgId) + "\n";
 	result += "Length : " + std::to_string(message_.payloadLength) + "\n";
 	result += "Payload : ";

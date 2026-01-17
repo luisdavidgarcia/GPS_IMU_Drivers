@@ -42,34 +42,10 @@
 static constexpr int MAX_MESSAGE_LENGTH = 1000;
 static constexpr int MAX_PAYLOAD_LENGTH = 92;
 
-
-struct alignas(128) UbxMessage {
-	uint8_t sync1;
-	uint8_t sync2;
-	uint8_t msgClass;
-	uint8_t msgId;
-	uint16_t payloadLength;
-	std::array<uint8_t, MAX_PAYLOAD_LENGTH> payload;
-	uint8_t checksumA;
-	uint8_t checksumB;
-};
-
-struct alignas(2) MessageInfo {
-	uint8_t msgClass;
-	uint8_t msgId;
-};
-
 class UBX {
 public:
 	UBX();
 	~UBX();
-	void ComposeMessage(const MessageInfo &messageInfo,
-			const std::vector<uint8_t> &payload);
-	const UbxMessage& GetUBXMessage() const {
-		return message_;
-	}
-	void ComputeChecksum();
-	void ResetPayload();
 
 	//********* SYNC CHAR SECTION **********
 	static constexpr uint8_t SYNC_CHAR_1 = 0xB5;
@@ -87,7 +63,7 @@ public:
 	static constexpr uint8_t CFG_MSG = 0x01;
 	static constexpr uint8_t CFG_RATE = 0x08;
 
-	enum class MsgClass {
+	enum class MsgClass : uint8_t {
 		NAV_CLASS = 0x01,
 		RXM_CLASS = 0x02,
 		INF_CLASS = 0x04,
@@ -104,7 +80,7 @@ public:
 		HNR_CLASS = 0x28,
 	};
 
-	enum class FixFlags {
+	enum class FixFlags : uint8_t {
 		NO_FIX = 0,
 		DEAD_RECKONING_ONLY = 1,
 		TWO_D_FIX = 2,
@@ -113,6 +89,30 @@ public:
 		TIME_ONLY_FIX = 5,
 	};
 
+	struct alignas(128) UbxMessage {
+		uint8_t sync1;
+		uint8_t sync2;
+		MsgClass msgClass;
+		uint8_t msgId;
+		uint16_t payloadLength;
+		std::array<uint8_t, MAX_PAYLOAD_LENGTH> payload;
+		uint8_t checksumA;
+		uint8_t checksumB;
+	};
+
+	struct alignas(2) MessageInfo {
+		MsgClass msgClass;
+		uint8_t msgId;
+	};
+
+	void ComposeMessage(const MessageInfo &messageInfo,
+			const std::vector<uint8_t> &payload);
+
+	const UbxMessage& GetUBXMessage() const {
+		return message_;
+	}
+	void ComputeChecksum();
+	void ResetPayload();
 	std::string MsgClassToString(MsgClass msgClass) const;
 	std::string GetGNSSFixType(FixFlags fixFlag) const;
 	std::string UbxMessageToString() const;

@@ -38,10 +38,6 @@
 #include <vector>
 #include <array>
 
-//******* DEBUG/HELPING CONSTANTS ********
-static constexpr int MAX_MESSAGE_LENGTH = 1000;
-static constexpr int MAX_PAYLOAD_LENGTH = 92;
-
 class UBX
 {
 public:
@@ -62,7 +58,7 @@ public:
     static constexpr uint8_t cfg_inf = 0x02;
     static constexpr uint8_t cfg_rate = 0x08;
 
-    enum class MsgClass : uint8_t
+    enum class Msg_class : uint8_t
     {
         nav = 0x01,
         rxm = 0x02,
@@ -80,33 +76,23 @@ public:
         hnr = 0x28,
     };
 
-    enum class FixFlags : uint8_t
-    {
-        no_fix = 0,
-        dead_reckoning_only = 1,
-        two_d_fix = 2,
-        three_d_fix = 3,
-        gnss_dead_reckoning_combined = 4,
-        time_only_fix = 5,
-    };
-
     struct UBX_message
     {
         uint8_t sync1
             { sync_char_1 };
         uint8_t sync2
             { sync_char_2 };
-        MsgClass msgClass
-            { MsgClass::nav };
-        uint8_t msgID
+        Msg_class msg_class
+            { Msg_class::nav };
+        uint8_t msg_id
             { cfg_prt };
-        uint16_t payloadLength
+        uint16_t payload_length
             { 0 };
         std::vector<uint8_t> payload
             { };
-        uint8_t checksumA
+        uint8_t checksum_a
             { 0 };
-        uint8_t checksumB
+        uint8_t checksum_b
             { 0 };
     };
 

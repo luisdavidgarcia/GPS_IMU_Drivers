@@ -6,21 +6,21 @@
  */
 void UBX::compute_checksum(UBX_message &message)
 {
-    message.checksumA = static_cast<uint8_t>(message.msgClass);
-    message.checksumB = message.checksumA;
+    message.checksum_a = static_cast<uint8_t>(message.msg_class);
+    message.checksum_b = message.checksum_a;
 
-    message.checksumA += message.msgID;
-    message.checksumB += message.checksumA;
+    message.checksum_a += message.msg_id;
+    message.checksum_b += message.checksum_a;
 
-    message.checksumA += message.payloadLength % (1 << 8);
-    message.checksumB += message.checksumA;
+    message.checksum_a += message.payload_length % (1 << 8);
+    message.checksum_b += message.checksum_a;
 
-    message.checksumA += message.payloadLength >> 8;
-    message.checksumB += message.checksumA;
+    message.checksum_a += message.payload_length >> 8;
+    message.checksum_b += message.checksum_a;
 
-    for (int i = 0; i < message.payloadLength; i++) {
-        message.checksumA += message.payload.at(i);
-        message.checksumB += message.checksumA;
+    for (auto element : message.payload) {
+        message.checksum_a += element;
+        message.checksum_b += message.checksum_a;
     }
 }
 

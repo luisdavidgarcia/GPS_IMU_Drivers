@@ -103,7 +103,7 @@ int main(void)
   MX_UART5_Init(); // For data collection
   /* USER CODE BEGIN 2 */
 
-  app_main_C(&hi2c1, &huart4);
+  C_app_main(&hi2c1, &huart4);
   /* USER CODE END 2 */
 
   /* Infinite loop */

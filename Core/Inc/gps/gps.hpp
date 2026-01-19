@@ -42,11 +42,13 @@
 #ifndef GPS_HPP
 #define GPS_HPP
 
-extern "C" {
+extern "C"
+{
 #include "stm32l4xx_hal.h"
 }
 
 #include "ubx/ubx.hpp"
+#include "mpu9250_imu/mpu9250_register_map.hpp"
 
 #include <fcntl.h>
 #include <span>
@@ -62,8 +64,6 @@ constexpr int DEFAULT_TIMEOUT = 1000;
 /** I2C Specifics */
 constexpr uint8_t UART_PORT = 0x01;
 
-constexpr int BYTE_SHIFT_AMOUNT = 8;
-constexpr int BYTE_MASK = 0xFF;
 constexpr int HALF_WORD_SHIFT_AMOUNT = 16;
 constexpr int THREE_BYTE_SHIFT_AMOUNT = 24;
 
@@ -104,31 +104,31 @@ constexpr int MAX_DEGREE = 360;
 constexpr int MIN_DEGREE = 0;
 constexpr int MAX_MAG_DEGREE_ACCURACY = 180;
 
-constexpr float MAX_DYNAMICS_G = 4.0F;                        // Maximum dynamics in g
-constexpr float MAX_ALTITUDE_METERS = 50000.0F;               // Maximum altitude in meters
-constexpr float MIN_ALTITUDE_METERS = -50000.0F;              // Minimum altitude in meters
-constexpr float MAX_VELOCITY_MPS = 500.0F;                    // Maximum velocity in meters per second
-constexpr float MIN_VELOCITY_MPS = -500.0F;                   // Minimum velocity in meters per second
-constexpr float VELOCITY_ACCURACY_THRESHOLD_MPS = 0.05F;      // Velocity accuracy in meters per second
-constexpr float HEADING_ACCURACY_DEGREES = 0.3F;              // Heading accuracy in degrees
+constexpr float MAX_DYNAMICS_G = 4.0F;                  // Maximum dynamics in g
+constexpr float MAX_ALTITUDE_METERS = 50000.0F;    // Maximum altitude in meters
+constexpr float MIN_ALTITUDE_METERS = -50000.0F;   // Minimum altitude in meters
+constexpr float MAX_VELOCITY_MPS = 500.0F; // Maximum velocity in meters per second
+constexpr float MIN_VELOCITY_MPS = -500.0F; // Minimum velocity in meters per second
+constexpr float VELOCITY_ACCURACY_THRESHOLD_MPS = 0.05F; // Velocity accuracy in meters per second
+constexpr float HEADING_ACCURACY_DEGREES = 0.3F;  // Heading accuracy in degrees
 
-constexpr float HORIZONTAL_ACCURACY_GPS_GLONASS_M = 2.5F;     // Horizontal position accuracy for GPS & GLONASS in meters
-constexpr float HORIZONTAL_ACCURACY_GALILEO_M = 8.0F;         // Horizontal position accuracy for Galileo in meters (To be confirmed)
+constexpr float HORIZONTAL_ACCURACY_GPS_GLONASS_M = 2.5F; // Horizontal position accuracy for GPS & GLONASS in meters
+constexpr float HORIZONTAL_ACCURACY_GALILEO_M = 8.0F; // Horizontal position accuracy for Galileo in meters (To be confirmed)
 
-constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_GPS = 10;         // Max navigation update rate for GPS in Hz
-constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_OTHER = 18;       // Max navigation update rate for GLONASS and Galileo in Hz
+constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_GPS = 10; // Max navigation update rate for GPS in Hz
+constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_OTHER = 18; // Max navigation update rate for GLONASS and Galileo in Hz
 
-constexpr int COLD_START_TTFF_SECONDS = 26;                   // Time-To-First-Fix for cold start in seconds
-constexpr int HOT_START_TTFF_SECONDS = 1;                     // Time-To-First-Fix for hot start in seconds
-constexpr int AIDED_START_TTFF_SECONDS = 2;                   // Time-To-First-Fix for aided starts in seconds
+constexpr int COLD_START_TTFF_SECONDS = 26; // Time-To-First-Fix for cold start in seconds
+constexpr int HOT_START_TTFF_SECONDS = 1; // Time-To-First-Fix for hot start in seconds
+constexpr int AIDED_START_TTFF_SECONDS = 2; // Time-To-First-Fix for aided starts in seconds
 
-constexpr int SENSITIVITY_TRACK_NAV_DBM = -165;               // Sensitivity for tracking & navigation in dBm
-constexpr int SENSITIVITY_REACQUISITION_DBM = -158;           // Sensitivity for reacquisition in dBm
-constexpr int SENSITIVITY_COLD_HOT_START_DBM = -146;          // Sensitivity for cold and hot starts in dBm
+constexpr int SENSITIVITY_TRACK_NAV_DBM = -165; // Sensitivity for tracking & navigation in dBm
+constexpr int SENSITIVITY_REACQUISITION_DBM = -158; // Sensitivity for reacquisition in dBm
+constexpr int SENSITIVITY_COLD_HOT_START_DBM = -146; // Sensitivity for cold and hot starts in dBm
 
-constexpr int MEASUREMENT_PERIOD_MILLIS_1_SEC = 1000;         // Measurement period in milliseconds
-constexpr int MEASUREMENT_PERIOD_MILLIS_100_MS = 100;         // Measurement period in milliseconds
-constexpr int MEASUREMENT_PERIOD_MILLIS_25_MS = 25;           // Measurement period in milliseconds
+constexpr int MEASUREMENT_PERIOD_MILLIS_1_SEC = 1000; // Measurement period in milliseconds
+constexpr int MEASUREMENT_PERIOD_MILLIS_100_MS = 100; // Measurement period in milliseconds
+constexpr int MEASUREMENT_PERIOD_MILLIS_25_MS = 25; // Measurement period in milliseconds
 
 constexpr float LONGTITUDE_SCALE = 1e-07F;
 constexpr float LATTITUDE_SCALE = 1e-07F;
@@ -145,77 +145,80 @@ constexpr int DEFAULT_TIME_REF = 0;
 constexpr int INVALID_YEAR_FLAG = 0xBEEF;
 static constexpr int INVALID_SYNC_FLAG = 255;
 
-struct alignas(128) PVTData {
-  // Time Information
-  uint16_t year;                        // Year (UTC)
-  uint8_t month;                        // Month (UTC)
-  uint8_t day;                          // Day of the month (UTC)
-  uint8_t hour;                         // Hour of the day (UTC)
-  uint8_t min;                          // Minute of the hour (UTC)
-  uint8_t sec;                          // Second of the minute (UTC)
+struct alignas(128) PVTData
+{
+    // Time Information
+    uint16_t year;                        // Year (UTC)
+    uint8_t month;                        // Month (UTC)
+    uint8_t day;                          // Day of the month (UTC)
+    uint8_t hour;                         // Hour of the day (UTC)
+    uint8_t min;                          // Minute of the hour (UTC)
+    uint8_t sec;                          // Second of the minute (UTC)
 
-  // Validity Flags
-  uint8_t validTimeFlag;                // Validity flags for time
-  uint8_t validDateFlag;                // Validity flags for time
-  uint8_t fullyResolved;                // Validity flags for time
-  uint8_t validMagFlag;                 // Validity flags for time
+    // Validity Flags
+    uint8_t validTimeFlag;                // Validity flags for time
+    uint8_t validDateFlag;                // Validity flags for time
+    uint8_t fullyResolved;                // Validity flags for time
+    uint8_t validMagFlag;                 // Validity flags for time
 
-  // GNSS
-  uint8_t gnssFix;
-  uint8_t fixStatusFlags;
-  uint8_t numberOfSatellites;
+    // GNSS
+    uint8_t gnssFix;
+    uint8_t fixStatusFlags;
+    uint8_t numberOfSatellites;
 
-  // Coordinates
-  float longitude;
-  float latitude;                       // Latitude (degrees * 1e7)
-  int32_t height;                       // Height above ellipsoid (millimeters)
-  int32_t heightMSL;                    // Height above mean sea level (millimeters)
+    // Coordinates
+    float longitude;
+    float latitude;                       // Latitude (degrees * 1e7)
+    int32_t height;                      // Height above ellipsoid (millimeters)
+    int32_t heightMSL;              // Height above mean sea level (millimeters)
 
-  // Accuracy Information
-  uint32_t horizontalAccuracy;          // Horizontal accuracy estimate (millimeters)
-  uint32_t verticalAccuracy;            // Vertical accuracy estimate (millimeters)
+    // Accuracy Information
+    uint32_t horizontalAccuracy;   // Horizontal accuracy estimate (millimeters)
+    uint32_t verticalAccuracy;       // Vertical accuracy estimate (millimeters)
 
-  // Velocity and Heading
-  int32_t velocityNorth;                // Velocity in the north direction (millimeters/second)
-  int32_t velocityEast;                 // Velocity in the east direction (millimeters/second)
-  int32_t velocityDown;                 // Velocity in the down direction (millimeters/second)
-  int32_t groundSpeed;                  // Ground speed (millimeters/second)
-  float vehicalHeading;
-  float motionHeading;                  // Heading of motion (degrees * 1e5)
-  uint32_t speedAccuracy;               // Speed accuracy estimate (millimeters/second)
-  float motionHeadingAccuracy;
+    // Velocity and Heading
+    int32_t velocityNorth; // Velocity in the north direction (millimeters/second)
+    int32_t velocityEast; // Velocity in the east direction (millimeters/second)
+    int32_t velocityDown; // Velocity in the down direction (millimeters/second)
+    int32_t groundSpeed;                  // Ground speed (millimeters/second)
+    float vehicalHeading;
+    float motionHeading;                  // Heading of motion (degrees * 1e5)
+    uint32_t speedAccuracy;      // Speed accuracy estimate (millimeters/second)
+    float motionHeadingAccuracy;
 
-  // Magnetic Declination
-  float magneticDeclination;            // Magnetic declination (degrees * 1e2)
-  float magnetDeclinationAccuracy;      // Declination accuracy (degrees * 1e2)
+    // Magnetic Declination
+    float magneticDeclination;           // Magnetic declination (degrees * 1e2)
+    float magnetDeclinationAccuracy;     // Declination accuracy (degrees * 1e2)
 };
 
-struct alignas(4) MeasurementParams {
-	uint16_t measurementPeriodMillis = DEFAULT_UPDATE_MILLS;
-	uint8_t navigationRate = DEFAULT_NAVIGATION_RATE;
-	uint8_t timeref = DEFAULT_TIME_REF;
+struct alignas(4) MeasurementParams
+{
+    uint16_t measurementPeriodMillis = DEFAULT_UPDATE_MILLS;
+    uint8_t navigationRate = DEFAULT_NAVIGATION_RATE;
+    uint8_t timeref = DEFAULT_TIME_REF;
 };
 
-class GPS {
+class GPS
+{
 public:
-  explicit GPS(int16_t currentYear, UART_HandleTypeDef* huart);
-  PVTData GetPvt();
+    explicit GPS(int16_t currentYear, UART_HandleTypeDef *huart);
+    PVTData GetPvt();
 
 private:
-  int16_t currentYear_;
-  PVTData pvtData_;
-  UBX ubx_;
-  UART_HandleTypeDef* m_huart_;
+    int16_t currentYear_;
+    PVTData pvtData_;
+    UBX ubx_;
+    UART_HandleTypeDef *m_huart_;
 
-  void ubxSetup();
-  bool writeUbxMessage(UBX::UbxMessage& message) const;
-  UBX::UbxMessage readUbxMessage(uint16_t messageSize);
+    void ubxSetup();
+    bool writeUbxMessage(UBX::UbxMessage &message) const;
+    UBX::UbxMessage readUbxMessage(uint16_t messageSize);
 
-  static double bytes_to_double(const uint8_t *little_endian_bytes);
-  static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);
-  static uint16_t u2_to_int(std::span<const uint8_t, 2> bytes);
-  static int32_t i4_to_int(std::span<const uint8_t, 4> bytes);
-  static uint32_t u4_to_int(std::span<const uint8_t, 4> bytes);
+    static double bytes_to_double(const uint8_t *little_endian_bytes);
+    static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);
+    static uint16_t u2_to_int(std::span<const uint8_t, 2> bytes);
+    static int32_t i4_to_int(std::span<const uint8_t, 4> bytes);
+    static uint32_t u4_to_int(std::span<const uint8_t, 4> bytes);
 
 };
 

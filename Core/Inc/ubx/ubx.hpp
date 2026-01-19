@@ -48,50 +48,51 @@ public:
 	~UBX();
 
 	//********* SYNC CHAR SECTION **********
-	static constexpr uint8_t SYNC_CHAR_1 = 0xB5;
-	static constexpr uint8_t SYNC_CHAR_2 = 0x62;
+	static constexpr uint8_t sync_char_1 = 0xB5;
+	static constexpr uint8_t sync_char_2 = 0x62;
 
 	//********* NAV MESSAGE SECTION **********
-	static constexpr uint8_t NAV_PVT = 0x07;
+	static constexpr uint8_t nav_pvt = 0x07;
 
 	//********* ACK MESSAGE SECTION **********
-	static constexpr uint8_t ACK_ACK = 0x01;
-	static constexpr uint8_t ACK_NAK = 0x00;
+	static constexpr uint8_t ack_ack = 0x01;
+	static constexpr uint8_t ack_nak = 0x00;
 
 	//********* CFG MESSAGE SECTION **********
-	static constexpr uint8_t CFG_PRT = 0x00;
-	static constexpr uint8_t CFG_MSG = 0x01;
-	static constexpr uint8_t CFG_RATE = 0x08;
+	static constexpr uint8_t cfg_prt = 0x00;
+	static constexpr uint8_t cfg_msg = 0x01;
+	static constexpr uint8_t cfg_inf = 0x02;
+	static constexpr uint8_t cfg_rate = 0x08;
 
 	enum class MsgClass : uint8_t {
-		NAV_CLASS = 0x01,
-		RXM_CLASS = 0x02,
-		INF_CLASS = 0x04,
-		ACK_CLASS = 0x05,
-		CFG_CLASS = 0x06,
-		UPD_CLASS = 0x09,
-		MON_CLASS = 0x0A,
-		AID_CLASS = 0x0B,
-		TIM_CLASS = 0x0D,
-		ESF_CLASS = 0x10,
-		MGA_CLASS = 0x13,
-		LOG_CLASS = 0x21,
-		SEC_CLASS = 0x27,
-		HNR_CLASS = 0x28,
+		nav = 0x01,
+		rxm = 0x02,
+		inf = 0x04,
+		ack = 0x05,
+		cfg = 0x06,
+		upd = 0x09,
+		mon = 0x0A,
+		aid = 0x0B,
+		tim = 0x0D,
+		esf = 0x10,
+		mga = 0x13,
+		log = 0x21,
+		sec = 0x27,
+		hnr = 0x28,
 	};
 
 	enum class FixFlags : uint8_t {
-		NO_FIX = 0,
-		DEAD_RECKONING_ONLY = 1,
-		TWO_D_FIX = 2,
-		THREE_D_FIX = 3,
-		GNSS_DEAD_RECKONING_COMBINED = 4,
-		TIME_ONLY_FIX = 5,
+		no_fix = 0,
+		dead_reckoning_only = 1,
+		two_d_fix = 2,
+		three_d_fix = 3,
+		gnss_dead_reckoning_combined = 4,
+		time_only_fix = 5,
 	};
 
 	struct alignas(128) UbxMessage {
-		uint8_t sync1;
-		uint8_t sync2;
+		uint8_t sync1 = sync_char_1;
+		uint8_t sync2 = sync_char_2;
 		MsgClass msgClass;
 		uint8_t msgId;
 		uint16_t payloadLength;
@@ -115,7 +116,6 @@ public:
 	void ResetPayload();
 	std::string MsgClassToString(MsgClass msgClass) const;
 	std::string GetGNSSFixType(FixFlags fixFlag) const;
-	std::string UbxMessageToString() const;
 
 private:
 	UbxMessage message_;

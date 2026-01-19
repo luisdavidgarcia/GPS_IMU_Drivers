@@ -34,9 +34,9 @@
  * - Include this header file in your C++ project to interact with a GPS module.
  * - Instantiate the Gps class to communicate with the GPS module and retrieve data.
  *
- * Note: This code is designed for a specific GPS module and may require adaptation for
- *       other GPS modules or hardware configurations. Refer to the provided credit and
- *       documentation for further details on usage and customization.
+ * Note: This code is designed for the GT-U7 GPS, but may be adapted to other modules.
+ * 			It is also UART based and thus is a poll based mechanism of transmit
+ * 			and receive for the data.
  */
 
 #ifndef GPS_HPP
@@ -57,8 +57,10 @@ extern "C" {
 #include <cstring>
 #include <cstdio>
 
+constexpr int DEFAULT_TIMEOUT = 1000;
+
 /** I2C Specifics */
-constexpr uint8_t GPS_I2C_ADDRESS = 0x42;
+constexpr uint8_t UART_PORT = 0x01;
 
 constexpr int BYTE_SHIFT_AMOUNT = 8;
 constexpr int BYTE_MASK = 0xFF;
@@ -196,22 +198,18 @@ struct alignas(4) MeasurementParams {
 
 class GPS {
 public:
-  explicit GPS(int16_t currentYear);
-  ~GPS();
-  PVTData GetPvt(bool polling);
+  explicit GPS(int16_t currentYear, UART_HandleTypeDef* huart);
+  PVTData GetPvt();
 
 private:
   int16_t currentYear_;
   PVTData pvtData_;
   UBX ubx_;
-  int i2c_fd_;
+  UART_HandleTypeDef* m_huart_;
 
   void ubxSetup();
-  bool writeUbxMessage() const;
-  uint16_t getAvailableBytes() const;
-  UBX::UbxMessage readUbxMessage();
-  bool setMessageSendRate(uint8_t sendRate = DEFAULT_SEND_RATE);
-  bool setMeasurementFrequency(const MeasurementParams& params);
+  bool writeUbxMessage(UBX::UbxMessage& message) const;
+  UBX::UbxMessage readUbxMessage(uint16_t messageSize);
 
   static double bytes_to_double(const uint8_t *little_endian_bytes);
   static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);

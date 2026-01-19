@@ -11,39 +11,17 @@
  *
  * Initializes the GPS module communication, sets message send rates, and measurement frequencies.
  */
-GPS::GPS(int16_t currentYear) :
-		currentYear_(currentYear), pvtData_ { } {
-
-	// Enable UART here for GPS
-
-	this->ubxSetup();
-
-	bool result = this->setMessageSendRate(DEFAULT_SEND_RATE);
-	if (!result) {
-		printf("Error: Failed to set message send rate for NAV_PVT.\n");
-		exit(-1);
-	}
-	MeasurementParams params = { MEASUREMENT_PERIOD_MILLIS_100_MS,
-			DEFAULT_SEND_RATE, DEFAULT_TIME_REF };
-	result = this->setMeasurementFrequency(params);
-	if (!result) {
-		printf("Error: Failed to set measurement frequency.\n");
-		exit(-1);
-	}
+GPS::GPS(int16_t currentYear, UART_HandleTypeDef *huart) :
+		currentYear_(currentYear), pvtData_ { }, m_huart_(huart) {
 
 	if (currentYear == DEFAULT_YEAR) {
 		printf("Error: Current year is not set.\n");
 		exit(-1);
 	}
-}
 
-/**
- * @brief   Destructor for the GPS class.
- *
- * Closes the communication with the GPS module.
- */
-GPS::~GPS() {
-	close(i2c_fd_);
+	// Enable UART here for GPS
+	// Set baud_rate, message rate, measurement frequency
+	ubxSetup();
 }
 
 /**
@@ -52,73 +30,37 @@ GPS::~GPS() {
  * Sends a UBX configuration message to the GPS module to use UBX protocol only.
  */
 void GPS::ubxSetup() {
-	std::vector < uint8_t > payload = { 0x00, 0x00, 0x00, 0x00, 0x84, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
-			0x00, 0x00, 0x00 };
-
-	UBX::MessageInfo classANDFlag = { UBX::MsgClass::CFG_CLASS, UBX::CFG_PRT };
-
-	ubx_.ComposeMessage(classANDFlag, payload);
-
-	bool result = this->writeUbxMessage();
+	// Send UART configuration
+	UBX::UbxMessage
+	setupMessage { .msgClass { UBX::MsgClass::cfg }, .msgID { UBX::cfg_prt },
+			.payloadLength { 20 }, .payload = { 0x01,					// PORT
+					0x00,						// Reserved0
+					0x00, 0x00,					// txReady
+					0xD0, 0x08, 0x00, 0x00,		// mode
+					0x00, 0xC2, 0x01, 0x00,		// baudRate
+					0x01, 0x00,					// inProtoMask
+					0x01, 0x00,					// outProtoMask
+					0x00, 0x00,					// reserved4
+					0x00, 0x00 					// reserved5
+					} };
+	ubx_.ComputeChecksum(setupMessage);
+	bool result = writeUbxMessage(setupMessage);
 	if (!result) {
 		exit(-1);
 	}
-}
 
-/**
- * @brief   Set the message send rate for a specific UBX message.
- *
- * @param   sendRate    The desired message send rate (default is DEFAULT_SEND_RATE).
- * @return  true if the message send rate was successfully set, false otherwise.
- */
-bool GPS::setMessageSendRate(uint8_t sendRate) {
-	std::vector < uint8_t > payload =
-			{ sendRate, 0x00, 0x00, 0x00, 0x00, 0x00 };
-
-	UBX::MessageInfo classANDFlag = { UBX::MsgClass::CFG_CLASS, UBX::CFG_MSG };
-	ubx_.ComposeMessage(classANDFlag, payload);
-
-	return this->writeUbxMessage();
-}
-
-/**
- * @brief   Set the measurement frequency of the GPS module.
- *
- * @param   params  Contains the measurementPeriodMillis (default is DEFAULT_UPDATE_MILLS),
- *    							navigationRate the navigation rate (default is 1), and
- *    							timeref the time reference (default is 0).
- * @return  true if the measurement frequency was successfully set, false otherwise.
- */
-bool GPS::setMeasurementFrequency(const MeasurementParams &params) {
-	std::vector < uint8_t > payload(6, 0);
-
-	payload[0] =
-			static_cast<uint8_t>(params.measurementPeriodMillis & BYTE_MASK);
-	payload[1] = static_cast<uint8_t>((params.measurementPeriodMillis
-			>> BYTE_SHIFT_AMOUNT) & BYTE_MASK);
-	payload[2] = params.navigationRate;
-	payload[3] = 0x00;
-	payload[4] = params.timeref;
-	payload[5] = 0x00;
-
-	UBX::MessageInfo classANDFlag = { UBX::MsgClass::CFG_CLASS, UBX::CFG_RATE };
-	ubx_.ComposeMessage(classANDFlag, payload);
-
-	return this->writeUbxMessage();
-}
-
-/**
- * @brief   Retrieve the number of available bytes for reading from the GPS module.
- *
- * @return  The number of available bytes.
- */
-uint16_t GPS::getAvailableBytes() const {
-	uint8_t msb = i2c_smbus_read_byte_data(i2c_fd_, AVAILABLE_BYTES_MSB);
-	uint8_t lsb = i2c_smbus_read_byte_data(i2c_fd_, AVAILABLE_BYTES_LSB);
-
-	uint16_t availableBytes = (msb << BYTE_SHIFT_AMOUNT) | lsb;
-	return availableBytes;
+	// Set Measurement Frequency
+	UBX::UbxMessage
+	setupMeasurementFrequencyMessage { .msgClass { UBX::MsgClass::cfg }, .msgID
+			{ UBX::cfg_rate }, .payloadLength { 6 }, .payload = { 0xE8, 0x03, // measRate
+			0x01, 0x00,  // navRate
+			0x00, 0x00   // timeRef
+			} };
+	ubx_.ComputeChecksum(setupMeasurementFrequencyMessage);
+	result = writeUbxMessage(setupMeasurementFrequencyMessage);
+	if (!result) {
+		exit(-1);
+	}
 }
 
 /**
@@ -126,30 +68,24 @@ uint16_t GPS::getAvailableBytes() const {
  *
  * @return  true if the message was successfully written, false otherwise.
  */
-bool GPS::writeUbxMessage() const {
-	UBX::UbxMessage ubxMessage = ubx_.GetUBXMessage();
+bool GPS::writeUbxMessage(UBX::UbxMessage &message) const {
 	std::vector < uint8_t > tempBuf;
-	tempBuf.push_back(ubxMessage.sync1);
-	tempBuf.push_back(ubxMessage.sync2);
-	tempBuf.push_back(static_cast<uint8_t>(ubxMessage.msgClass));
-	tempBuf.push_back(ubxMessage.msgId);
-	tempBuf.push_back(ubxMessage.payloadLength & BYTE_MASK);
-	tempBuf.push_back(ubxMessage.payloadLength >> BYTE_SHIFT_AMOUNT);
-	for (int i = 0; i < ubxMessage.payloadLength; i++) {
-		tempBuf.push_back(ubxMessage.payload.at(i));
+	tempBuf.push_back(message.sync1);
+	tempBuf.push_back(message.sync2);
+	tempBuf.push_back(static_cast<uint8_t>(message.msgClass));
+	tempBuf.push_back(message.msgID);
+	tempBuf.push_back(message.payloadLength & BYTE_MASK);
+	tempBuf.push_back(message.payloadLength >> BYTE_SHIFT_AMOUNT);
+	for (int i = 0; i < message.payloadLength; i++) {
+		tempBuf.push_back(message.payload.at(i));
 	}
-	tempBuf.push_back(ubxMessage.checksumA);
-	tempBuf.push_back(ubxMessage.checksumB);
+	tempBuf.push_back(message.checksumA);
+	tempBuf.push_back(message.checksumB);
 
-	auto bytesWritten = write(i2c_fd_, tempBuf.data(), tempBuf.size());
-	if (bytesWritten < 0) {
+	HAL_StatusTypeDef status = HAL_UART_Transmit(m_huart_, tempBuf.data(),
+			tempBuf.size(), DEFAULT_TIMEOUT);
+	if (status == HAL_ERROR) {
 		perror("Failed to write to I2C device");
-		close(i2c_fd_);
-		return false;
-	}
-	if (static_cast<size_t>(bytesWritten) != tempBuf.size()) {
-		perror("Failed to receive all bytes from I2C device");
-		close(i2c_fd_);
 		return false;
 	}
 
@@ -161,39 +97,33 @@ bool GPS::writeUbxMessage() const {
  *
  * @return  The read UBX message.
  */
-UBX::UbxMessage GPS::readUbxMessage() {
-	uint16_t messageLength = getAvailableBytes();
-	std::vector < uint8_t > message;
+UBX::UbxMessage GPS::readUbxMessage(uint16_t messageSize) {
+	std::vector < uint8_t > message(messageSize);
 	UBX::UbxMessage badMsg = { INVALID_SYNC_FLAG };
+	HAL_StatusTypeDef status = HAL_UART_Receive(m_huart_, message.data(),
+			messageSize, DEFAULT_TIMEOUT);
+	if (status == HAL_ERROR) {
+		return badMsg;
+	}
 
-	if (messageLength > 2 && messageLength < MAX_MESSAGE_LENGTH) {
-		for (int i = 0; i < messageLength; i++) {
-			int32_t byte_data = i2c_smbus_read_byte_data(i2c_fd_,
-					DATA_STREAM_REGISTER);
-			if (byte_data < -1) {
-				perror("Failed to read byte from I2C device");
-				return badMsg;
-			}
-			message.push_back(static_cast<uint8_t>(byte_data));
+	if (message[0] == UBX::sync_char_1 && message[1] == UBX::sync_char_2) {
+		UBX::UbxMessage ubxMsg { };
+		ubxMsg.sync1 = message[0];
+		ubxMsg.sync2 = message[1];
+		ubxMsg.msgClass = static_cast<UBX::MsgClass>(message[2]);
+		ubxMsg.msgID = message[3];
+		ubxMsg.payloadLength = (message[5] << BYTE_SHIFT_AMOUNT | message[4]);
+		if (ubxMsg.payloadLength > messageSize) {
+			return badMsg;
 		}
+		uint8_t payload_offset = 6;
+		std::copy(message.begin() + payload_offset,
+				message.begin() + payload_offset + ubxMsg.payloadLength,
+				ubxMsg.payload.begin());
+		ubxMsg.checksumA = message[message.size() - 2];
+		ubxMsg.checksumB = message[message.size() - 1];
 
-		if (message[0] == UBX::SYNC_CHAR_1 && message[1] == UBX::SYNC_CHAR_2) {
-			UBX::UbxMessage ubxMsg = { };
-			ubxMsg.sync1 = message[0];
-			ubxMsg.sync2 = message[1];
-			ubxMsg.msgClass = static_cast<UBX::MsgClass>(message[2]);
-			ubxMsg.msgId = message[3];
-			ubxMsg.payloadLength =
-					(message[5] << BYTE_SHIFT_AMOUNT | message[4]);
-			if (ubxMsg.payloadLength > messageLength) {
-				return badMsg;
-			}
-			memcpy(&ubxMsg.payload, &message[6], ubxMsg.payloadLength);
-			ubxMsg.checksumA = message[message.size() - 2];
-			ubxMsg.checksumB = message[message.size() - 1];
-
-			return ubxMsg;
-		}
+		return ubxMsg;
 	}
 
 	return badMsg;
@@ -202,17 +132,11 @@ UBX::UbxMessage GPS::readUbxMessage() {
 /**
  * @brief   Retrieve Position-Velocity-Time (PVT) data from the GPS module.
  *
- * @param   polling         Whether to poll the GPS module for new data (default is DEFAULT_POLLING_STATE).
  * @return  The PVTData structure containing GPS-related information.
  */
-PVTData GPS::GetPvt(bool polling) {
-	if (polling) {
-		UBX::MessageInfo classANDFlag = { UBX::MsgClass::NAV_CLASS, UBX::NAV_PVT };
-		ubx_.ComposeMessage(classANDFlag, { });
-		this->writeUbxMessage();
-	}
-
-	UBX::UbxMessage message = this->readUbxMessage();
+PVTData GPS::GetPvt() {
+	uint16_t messageSize { 94 };
+	UBX::UbxMessage message = readUbxMessage(messageSize);
 
 	if (message.sync1 != INVALID_SYNC1_FLAG) {
 		pvtData_.year = u2_to_int(

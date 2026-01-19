@@ -91,7 +91,7 @@ public:
 		uint8_t sync1{sync_char_1};
 		uint8_t sync2{sync_char_2};
 		MsgClass msgClass{MsgClass::nav};
-		uint8_t msgId{cfg_prt};
+		uint8_t msgID{cfg_prt};
 		uint16_t payloadLength{0};
 		std::vector<uint8_t> payload{};
 		uint8_t checksumA{0};

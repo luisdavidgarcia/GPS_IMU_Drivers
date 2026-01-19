@@ -6,10 +6,10 @@
  */
 void UBX::ComputeChecksum(UbxMessage& message)
 {
-	message.checksumA = message.msgClass;
+	message.checksumA = static_cast<uint8_t>(message.msgClass);
 	message.checksumB = message.checksumA;
 
-	message.checksumA += message.msgId;
+	message.checksumA += message.msgID;
 	message.checksumB += message.checksumA;
 
 	message.checksumA += message.payloadLength % (1 << 8);

@@ -97,13 +97,13 @@ int main(void)
   MX_GPIO_Init();
   // IMU
   MX_I2C1_Init();
-  MX_USART2_UART_Init();
+  MX_USART2_UART_Init(); // For data collection
   // GPS
-  MX_UART4_Init();
-  MX_UART5_Init();
+  MX_UART4_Init(); // For communication with GPS
+  MX_UART5_Init(); // For data collection
   /* USER CODE BEGIN 2 */
 
-  app_main_C(&hi2c1);
+  app_main_C(&hi2c1, &huart4);
   /* USER CODE END 2 */
 
   /* Infinite loop */

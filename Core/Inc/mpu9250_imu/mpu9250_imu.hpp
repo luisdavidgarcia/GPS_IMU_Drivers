@@ -36,42 +36,42 @@ extern "C"
 #include <fcntl.h>
 #include <unistd.h>
 
-struct AccelMPS2
+struct Accel_mps2
 {
     int16_t x; // m/s^2
     int16_t y; // m/s^2
     int16_t z; // m/s^2
 };
 
-struct GyroRPS
+struct Gyro_rps
 {
     int16_t x; // rad/s
     int16_t y; // rad/s
     int16_t z; // rad/s
 };
 
-struct MagUT
+struct Mag_ut
 {
     int16_t x; // µT
     int16_t y; // µT
     int16_t z; // µT
 };
 
-struct ScaledAccelMPS2
+struct Scaled_accel_mps2
 {
     float x; // m/s^2
     float y; // m/s^2
     float z; // m/s^2
 };
 
-struct ScaledGyroRPS
+struct Scaled_gyro_rps
 {
     float x; // rad/s
     float y; // rad/s
     float z; // rad/s
 };
 
-struct ScaledMagUT
+struct Scaled_mag_ut
 {
     float x; // µT
     float y; // µT
@@ -86,85 +86,82 @@ public:
 
     void Read();
 
-    const AccelMPS2& GetRawAcceleration() const
+    const Accel_mps2& get_raw_acceleration() const
     {
-        return accelerometer_;
+        return m_accelerometer_;
     }
-    const GyroRPS& GetRawAngularVelocity() const
+    const Gyro_rps& get_raw_angular_velocity() const
     {
-        return gyroscope_;
+        return m_gyroscope_;
     }
-    const MagUT& GetRawMagneticField() const
+    const Mag_ut& get_raw_magnetic_field() const
     {
-        return magnetometer_;
+        return m_magnetometer_;
     }
 
-    inline ScaledAccelMPS2 GetScaledAcceleration() const
+    inline Scaled_accel_mps2 get_scaled_acceleration() const
     {
         return {
-            static_cast<float>(accelerometer_.x) * ACCEL_MG_LSB_4G - ACCEL_X_OFFSET,
-            static_cast<float>(accelerometer_.y) * ACCEL_MG_LSB_4G - ACCEL_Y_OFFSET,
-            static_cast<float>(accelerometer_.z) * ACCEL_MG_LSB_4G - ACCEL_Z_OFFSET,
+            static_cast<float>(m_accelerometer_.x) * accel_mg_lsb_4g - accel_x_offset,
+            static_cast<float>(m_accelerometer_.y) * accel_mg_lsb_4g - accel_y_offset,
+            static_cast<float>(m_accelerometer_.z) * accel_mg_lsb_4g - accel_z_offset,
         };
     }
 
-    inline ScaledGyroRPS GetScaledAngularVelocity() const
+    inline Scaled_gyro_rps get_scaled_angular_velocity() const
     {
         return {
-            static_cast<float>(gyroscope_.x) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_X_BIAS,
-            static_cast<float>(gyroscope_.y) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_Y_BIAS,
-            static_cast<float>(gyroscope_.z) * GYRO_SENSITIVITY_500DPS * DEG_TO_RAD - GYRO_Z_BIAS,
+            static_cast<float>(m_gyroscope_.x) * gyro_sensitivity_500dps * deg_to_rad - gyro_x_bias,
+            static_cast<float>(m_gyroscope_.y) * gyro_sensitivity_500dps * deg_to_rad - gyro_y_bias,
+            static_cast<float>(m_gyroscope_.z) * gyro_sensitivity_500dps * deg_to_rad - gyro_z_bias,
         };
     }
 
-    inline ScaledMagUT GetScaledMagneticField() const
+    inline Scaled_mag_ut get_scaled_magnetic_field() const
     {
         return {
-            static_cast<float>(magnetometer_.x) * MAG_UT_LSB,
-            static_cast<float>(magnetometer_.y) * MAG_UT_LSB,
-            static_cast<float>(magnetometer_.z) * MAG_UT_LSB,
+            static_cast<float>(m_magnetometer_.x) * mag_ut_lsb,
+            static_cast<float>(m_magnetometer_.y) * mag_ut_lsb,
+            static_cast<float>(m_magnetometer_.z) * mag_ut_lsb,
         };
     }
 
 private:
-    /** I2C Specifics */
-    static constexpr uint16_t MPU9250_ADDRESS = 0x68;
-    static constexpr uint16_t AK8963_ADDRESS = 0x0C;
-    static constexpr uint16_t DEFAULT_TIMEOUT = 1000;
+    /** I2C specifics */
+    static constexpr uint16_t mpu9250_address = 0x68;
+    static constexpr uint16_t ak8963_address = 0x0c;
+    static constexpr uint16_t default_timeout = 1000;
 
     /** Gyroscope sensitivity at 500dps */
-    static constexpr float GYRO_SENSITIVITY_500DPS = 1.0F / 65.5F;
-    static constexpr size_t GYRO_DATA_SIZE = 6;
-    static constexpr uint8_t GYRO_CONFIG_VALUE = 0x11 << 1;
+    static constexpr float gyro_sensitivity_500dps = 1.0f / 65.5f;
+    static constexpr size_t gyro_data_size = 6;
+    static constexpr uint8_t gyro_config_value = 0x11 << 1;
 
-    /** Macro for mg per LSB at +/- 4g sensitivity (1 LSB = 0.000488mg) */
-    static constexpr float ACCEL_MG_LSB_4G = 1.0F / 8192.0F;
+    /** Macro for mg per lsb at +/- 4g sensitivity (1 lsb = 0.000488mg) */
+    static constexpr float accel_mg_lsb_4g = 1.0f / 8192.0f;
 
-    /** Macro for micro tesla (uT) per LSB (1 LSB = 0.1uT) */
-    static constexpr float MAG_UT_LSB = 0.15F;
-    static constexpr float MAG_MAX_THRESHOLD = 5000.0F; // µT, adjust as needed
+    /** Macro for micro tesla (ut) per lsb (1 lsb = 0.1ut) */
+    static constexpr float mag_ut_lsb = 0.15f;
+    static constexpr float mag_max_threshold = 5000.0f; // µt, adjust as needed
 
     /** Filter constants */
-    static constexpr float ACCEL_X_OFFSET = -0.0567F;
-    static constexpr float ACCEL_Y_OFFSET = -0.0141F;
-    static constexpr float ACCEL_Z_OFFSET = -0.7006F;
-    static constexpr float GYRO_X_BIAS = -0.00845F;
-    static constexpr float GYRO_Y_BIAS = 0.00647F;
-    static constexpr float GYRO_Z_BIAS = -0.00955F;
+    static constexpr float accel_x_offset = -0.0567f;
+    static constexpr float accel_y_offset = -0.0141f;
+    static constexpr float accel_z_offset = -0.7006f;
+    static constexpr float gyro_x_bias = -0.00845f;
+    static constexpr float gyro_y_bias = 0.00647f;
+    static constexpr float gyro_z_bias = -0.00955f;
+
 
     I2C_HandleTypeDef *m_hi2c_;
-    uint8_t m_mpu9250_address_
-        { MPU9250_ADDRESS };
-    AccelMPS2 accelerometer_
-        { };
-    GyroRPS gyroscope_
-        { };
-    MagUT magnetometer_
-        { };
+    uint8_t m_mpu9250_address_ { mpu9250_address };
+    Accel_mps2 m_accelerometer_ {};
+    Gyro_rps m_gyroscope_ {};
+    Mag_ut m_magnetometer_ {};
     void begin() const;
-    void readAccelerometer();
-    void readGyroscope();
-    void readMagnetometer();
+    void read_accelerometer();
+    void read_gyroscope();
+    void read_magnetometer();
 };
 
 #endif // IMU_HPP

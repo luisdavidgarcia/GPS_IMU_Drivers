@@ -31,8 +31,8 @@ void IMU::begin() const
     // Reset the IMU
     uint8_t reset = 0x80;
     HAL_StatusTypeDef status = HAL_I2C_Mem_Write(m_hi2c_,
-            m_mpu9250_address_ << BYTE, PWR_MGMT_1, BYTE, &reset, BYTE,
-            DEFAULT_TIMEOUT);
+            m_mpu9250_address_ << byte, pwr_mgmt_1, byte, &reset, byte,
+            default_timeout);
     HAL_Delay(100);
     if (status == HAL_ERROR) {
         return;
@@ -40,8 +40,8 @@ void IMU::begin() const
 
     // Wake up the IMU
     uint8_t wakeup = 0;
-    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << BYTE, PWR_MGMT_1,
-            BYTE, &wakeup, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << byte, pwr_mgmt_1,
+            byte, &wakeup, byte, default_timeout);
     HAL_Delay(100);
     if (status == HAL_ERROR) {
         return;
@@ -49,8 +49,8 @@ void IMU::begin() const
 
     // Select the stable clock
     uint8_t stableClock = 0x01;
-    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << BYTE, PWR_MGMT_1,
-            BYTE, &stableClock, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << byte, pwr_mgmt_1,
+            byte, &stableClock, byte, default_timeout);
     HAL_Delay(100);
     if (status == HAL_ERROR) {
         return;
@@ -58,24 +58,24 @@ void IMU::begin() const
 
     // Configure the Gyroscope
     uint8_t set_500_dps = 0x08;
-    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << BYTE, GYRO_CONFIG,
-            BYTE, &set_500_dps, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << byte, gyro_config,
+            byte, &set_500_dps, byte, default_timeout);
     if (status == HAL_ERROR) {
         return;
     }
 
     // Configure the Accelerometer
     uint8_t set_4g = 0x08;
-    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << BYTE,
-            ACCEL_CONFIG, BYTE, &set_4g, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << byte,
+            accel_config, byte, &set_4g, byte, default_timeout);
     if (status == HAL_ERROR) {
         return;
     }
 
     // Enable bypass
     uint8_t bypass = 0x02;
-    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << BYTE, INT_PIN_CFG,
-            BYTE, &bypass, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, m_mpu9250_address_ << byte, int_pin_cfg,
+            byte, &bypass, byte, default_timeout);
     HAL_Delay(100);
     if (status == HAL_ERROR) {
         return;
@@ -83,8 +83,8 @@ void IMU::begin() const
 
     // Configure the Magnetmeteor (Turn if off)
     uint8_t turnOff = 0x00;
-    status = HAL_I2C_Mem_Write(m_hi2c_, AK8963_ADDRESS << BYTE, AK8963_CNTL,
-            BYTE, &turnOff, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, ak8963_address << byte, ak8963_cntl,
+            byte, &turnOff, byte, default_timeout);
     HAL_Delay(100);
     if (status == HAL_ERROR) {
         return;
@@ -92,8 +92,8 @@ void IMU::begin() const
 
     // Turn on the Magnetmeteor (Continuous 16-Bit Mode)
     uint8_t turnOn = 0x16;
-    status = HAL_I2C_Mem_Write(m_hi2c_, AK8963_ADDRESS << BYTE, AK8963_CNTL,
-            BYTE, &turnOn, BYTE, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Write(m_hi2c_, ak8963_address << byte, ak8963_cntl,
+            byte, &turnOn, byte, default_timeout);
     if (status == HAL_ERROR) {
         return;
     }
@@ -114,79 +114,79 @@ void IMU::begin() const
  */
 void IMU::Read()
 {
-    readAccelerometer();
-    readGyroscope();
-    readMagnetometer();
+    read_accelerometer();
+    read_gyroscope();
+    read_magnetometer();
 }
 
-void IMU::readAccelerometer()
+void IMU::read_accelerometer()
 {
     /* Read accelerometer data (Big Endian Order) */
     uint8_t raw_accel_data[6] =
         { 0, 0, 0, 0, 0, 0 };
     HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_,
-            m_mpu9250_address_ << BYTE, ACCEL_XOUT_H, BYTE, raw_accel_data, 6,
-            DEFAULT_TIMEOUT);
+            m_mpu9250_address_ << byte, accel_xout_h, byte, raw_accel_data, 6,
+            default_timeout);
     if (status == HAL_ERROR) {
         return;
     }
 
     // Converting Raw Accel Data to Readable data
-    accelerometer_.x = static_cast<int16_t>((raw_accel_data[0] << BITS_PER_BYTE)
-            | (raw_accel_data[1] & BYTE_MASK));
-    accelerometer_.y = static_cast<int16_t>((raw_accel_data[2] << BITS_PER_BYTE)
-            | (raw_accel_data[3] & BYTE_MASK));
-    accelerometer_.z = static_cast<int16_t>((raw_accel_data[4] << BITS_PER_BYTE)
-            | (raw_accel_data[5] & BYTE_MASK));
+    m_accelerometer_.x = static_cast<int16_t>((raw_accel_data[0] << bits_per_byte)
+            | (raw_accel_data[1] & byte_mask));
+    m_accelerometer_.y = static_cast<int16_t>((raw_accel_data[2] << bits_per_byte)
+            | (raw_accel_data[3] & byte_mask));
+    m_accelerometer_.z = static_cast<int16_t>((raw_accel_data[4] << bits_per_byte)
+            | (raw_accel_data[5] & byte_mask));
 }
 
-void IMU::readGyroscope()
+void IMU::read_gyroscope()
 {
     /* Read gyroscope data (Big Endian Order) */
     uint8_t raw_gyro_data[6] =
         { 0, 0, 0, 0, 0, 0 };
     HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_,
-            m_mpu9250_address_ << BYTE, GYRO_XOUT_H, BYTE, raw_gyro_data, 6,
-            DEFAULT_TIMEOUT);
+            m_mpu9250_address_ << byte, gyro_xout_h, byte, raw_gyro_data, 6,
+            default_timeout);
     if (status == HAL_ERROR) {
         return;
     }
 
     // Converting Raw Gyro Data to Readable data
-    gyroscope_.x = static_cast<int16_t>((raw_gyro_data[0] << BITS_PER_BYTE)
-            | (raw_gyro_data[1] & BYTE_MASK));
-    gyroscope_.y = static_cast<int16_t>((raw_gyro_data[2] << BITS_PER_BYTE)
-            | (raw_gyro_data[3] & BYTE_MASK));
-    gyroscope_.z = static_cast<int16_t>((raw_gyro_data[4] << BITS_PER_BYTE)
-            | (raw_gyro_data[5] & BYTE_MASK));
+    m_gyroscope_.x = static_cast<int16_t>((raw_gyro_data[0] << bits_per_byte)
+            | (raw_gyro_data[1] & byte_mask));
+    m_gyroscope_.y = static_cast<int16_t>((raw_gyro_data[2] << bits_per_byte)
+            | (raw_gyro_data[3] & byte_mask));
+    m_gyroscope_.z = static_cast<int16_t>((raw_gyro_data[4] << bits_per_byte)
+            | (raw_gyro_data[5] & byte_mask));
 }
 
-void IMU::readMagnetometer()
+void IMU::read_magnetometer()
 {
     /* Read magnetometer data one-burst (Little Endian Order) */
     uint8_t st1 = 0;
-    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_, AK8963_ADDRESS << BYTE,
-            AK8963_ST1, BYTE, &st1, BYTE, DEFAULT_TIMEOUT);
-    if ((status == HAL_ERROR) || !(st1 & AK8963_DATA_READY)) {
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(m_hi2c_, ak8963_address << byte,
+            ak8963_st1, byte, &st1, byte, default_timeout);
+    if ((status == HAL_ERROR) || !(st1 & ak8963_data_ready)) {
         return;
     }
 
     uint8_t raw_mag_data[7] =
         { 0, 0, 0, 0, 0, 0, 0 };
-    status = HAL_I2C_Mem_Read(m_hi2c_, AK8963_ADDRESS << BYTE, AK8963_XOUT_L,
-            BYTE, raw_mag_data, 7, DEFAULT_TIMEOUT);
+    status = HAL_I2C_Mem_Read(m_hi2c_, ak8963_address << byte, ak8963_xout_l,
+            byte, raw_mag_data, 7, default_timeout);
 
     uint8_t st2 = raw_mag_data[6];
-    if (!(st2 & AK8963_MAGNETIC_OVERFLOW)) {
+    if (!(st2 & ak8963_magnetic_overflow)) {
         // Converting Raw Mag Data to Readable data
-        magnetometer_.x =
-                static_cast<int16_t>((raw_mag_data[1] << BITS_PER_BYTE)
-                        | (raw_mag_data[0] & BYTE_MASK));
-        magnetometer_.y =
-                static_cast<int16_t>((raw_mag_data[3] << BITS_PER_BYTE)
-                        | (raw_mag_data[2] & BYTE_MASK));
-        magnetometer_.z =
-                static_cast<int16_t>((raw_mag_data[5] << BITS_PER_BYTE)
-                        | (raw_mag_data[4] & BYTE_MASK));
+        m_magnetometer_.x =
+                static_cast<int16_t>((raw_mag_data[1] << bits_per_byte)
+                        | (raw_mag_data[0] & byte_mask));
+        m_magnetometer_.y =
+                static_cast<int16_t>((raw_mag_data[3] << bits_per_byte)
+                        | (raw_mag_data[2] & byte_mask));
+        m_magnetometer_.z =
+                static_cast<int16_t>((raw_mag_data[5] << bits_per_byte)
+                        | (raw_mag_data[4] & byte_mask));
     }
 }

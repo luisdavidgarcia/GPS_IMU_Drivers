@@ -44,9 +44,6 @@ static constexpr int MAX_PAYLOAD_LENGTH = 92;
 
 class UBX {
 public:
-	UBX();
-	~UBX();
-
 	//********* SYNC CHAR SECTION **********
 	static constexpr uint8_t sync_char_1 = 0xB5;
 	static constexpr uint8_t sync_char_2 = 0x62;
@@ -90,35 +87,18 @@ public:
 		time_only_fix = 5,
 	};
 
-	struct alignas(128) UbxMessage {
-		uint8_t sync1 = sync_char_1;
-		uint8_t sync2 = sync_char_2;
-		MsgClass msgClass;
-		uint8_t msgId;
-		uint16_t payloadLength;
-		std::array<uint8_t, MAX_PAYLOAD_LENGTH> payload;
-		uint8_t checksumA;
-		uint8_t checksumB;
+	struct UbxMessage {
+		uint8_t sync1{sync_char_1};
+		uint8_t sync2{sync_char_2};
+		MsgClass msgClass{MsgClass::nav};
+		uint8_t msgId{cfg_prt};
+		uint16_t payloadLength{0};
+		std::vector<uint8_t> payload{};
+		uint8_t checksumA{0};
+		uint8_t checksumB{0};
 	};
 
-	struct alignas(2) MessageInfo {
-		MsgClass msgClass;
-		uint8_t msgId;
-	};
-
-	void ComposeMessage(const MessageInfo &messageInfo,
-			const std::vector<uint8_t> &payload);
-
-	const UbxMessage& GetUBXMessage() const {
-		return message_;
-	}
-	void ComputeChecksum();
-	void ResetPayload();
-	std::string MsgClassToString(MsgClass msgClass) const;
-	std::string GetGNSSFixType(FixFlags fixFlag) const;
-
-private:
-	UbxMessage message_;
+	void ComputeChecksum(UbxMessage& message);
 };
 
 #endif // UBX_HPP

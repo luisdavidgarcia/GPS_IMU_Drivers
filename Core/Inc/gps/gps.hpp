@@ -49,6 +49,7 @@ extern "C"
 
 #include "ubx/ubx.hpp"
 #include "mpu9250_imu/mpu9250_register_map.hpp"
+#include "gps/gps_constants.hpp"
 
 #include <fcntl.h>
 #include <span>
@@ -58,92 +59,6 @@ extern "C"
 #include <vector>
 #include <cstring>
 #include <cstdio>
-
-constexpr int DEFAULT_TIMEOUT = 1000;
-
-/** I2C Specifics */
-constexpr uint8_t UART_PORT = 0x01;
-
-constexpr int HALF_WORD_SHIFT_AMOUNT = 16;
-constexpr int THREE_BYTE_SHIFT_AMOUNT = 24;
-
-constexpr int DATA_STREAM_REGISTER = 0xFF;
-
-constexpr int AVAILABLE_BYTES_MSB = 0xFD;
-constexpr int AVAILABLE_BYTES_LSB = 0xFE;
-
-constexpr int DEFAULT_TIMEOUT_MILLS = 2000;
-constexpr int DEFAULT_UPDATE_MILLS = 1000;
-constexpr int DEFAULT_SEND_RATE = 0x01;
-constexpr int DEFAULT_INTERVAL_MILLS = 50;
-constexpr bool DEFAULT_POLLING_STATE = false;
-constexpr int DEFAULT_YEAR = -1;
-
-constexpr int VALID_DATE_FLAG = 0x01;
-constexpr int VALID_TIME_FLAG = 0x02;
-constexpr int FULLY_RESOLVED_FLAG = 0x04;
-constexpr int VALID_MAG_FLAG = 0x08;
-constexpr int INVALID_SYNC1_FLAG = 0xFF;
-
-/** SAM-M8Q Limits */
-constexpr int MAX_MONTH = 12;
-constexpr int MIN_MONTH = 1;
-constexpr int MAX_DAY = 31;
-constexpr int MIN_DAY = 1;
-constexpr int MAX_HOUR = 23;
-constexpr int MIN_HOUR = 0;
-constexpr int MAX_MINUTE = 59;
-constexpr int MIN_MINUTE = 0;
-constexpr int MAX_SECOND = 59;
-constexpr int MIN_SECOND = 0;
-constexpr float MAX_LONGTITUTE = 180.0F;
-constexpr float MIN_LONGTITUTE = -180.0F;
-constexpr float MAX_LATITUDE = 90.0F;
-constexpr float MIN_LATITUDE = -90.0F;
-constexpr int MAX_DEGREE = 360;
-constexpr int MIN_DEGREE = 0;
-constexpr int MAX_MAG_DEGREE_ACCURACY = 180;
-
-constexpr float MAX_DYNAMICS_G = 4.0F;                  // Maximum dynamics in g
-constexpr float MAX_ALTITUDE_METERS = 50000.0F;    // Maximum altitude in meters
-constexpr float MIN_ALTITUDE_METERS = -50000.0F;   // Minimum altitude in meters
-constexpr float MAX_VELOCITY_MPS = 500.0F; // Maximum velocity in meters per second
-constexpr float MIN_VELOCITY_MPS = -500.0F; // Minimum velocity in meters per second
-constexpr float VELOCITY_ACCURACY_THRESHOLD_MPS = 0.05F; // Velocity accuracy in meters per second
-constexpr float HEADING_ACCURACY_DEGREES = 0.3F;  // Heading accuracy in degrees
-
-constexpr float HORIZONTAL_ACCURACY_GPS_GLONASS_M = 2.5F; // Horizontal position accuracy for GPS & GLONASS in meters
-constexpr float HORIZONTAL_ACCURACY_GALILEO_M = 8.0F; // Horizontal position accuracy for Galileo in meters (To be confirmed)
-
-constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_GPS = 10; // Max navigation update rate for GPS in Hz
-constexpr int MAX_NAVIGATION_UPDATE_RATE_HZ_OTHER = 18; // Max navigation update rate for GLONASS and Galileo in Hz
-
-constexpr int COLD_START_TTFF_SECONDS = 26; // Time-To-First-Fix for cold start in seconds
-constexpr int HOT_START_TTFF_SECONDS = 1; // Time-To-First-Fix for hot start in seconds
-constexpr int AIDED_START_TTFF_SECONDS = 2; // Time-To-First-Fix for aided starts in seconds
-
-constexpr int SENSITIVITY_TRACK_NAV_DBM = -165; // Sensitivity for tracking & navigation in dBm
-constexpr int SENSITIVITY_REACQUISITION_DBM = -158; // Sensitivity for reacquisition in dBm
-constexpr int SENSITIVITY_COLD_HOT_START_DBM = -146; // Sensitivity for cold and hot starts in dBm
-
-constexpr int MEASUREMENT_PERIOD_MILLIS_1_SEC = 1000; // Measurement period in milliseconds
-constexpr int MEASUREMENT_PERIOD_MILLIS_100_MS = 100; // Measurement period in milliseconds
-constexpr int MEASUREMENT_PERIOD_MILLIS_25_MS = 25; // Measurement period in milliseconds
-
-constexpr float LONGTITUDE_SCALE = 1e-07F;
-constexpr float LATTITUDE_SCALE = 1e-07F;
-constexpr float MOTION_HEADING_SCALE = 1e-05F;
-constexpr float MOTION_HEADING_ACCURACY_SCALE = 1e-05F;
-constexpr float VEHICLE_HEADING_SCALE = 1e-05F;
-constexpr float MAGNETIC_DECLINATION_SCALE = 1e-02F;
-constexpr float MAGNETIC_DECLINATION_ACCURACY_SCALE = 1e-02F;
-
-constexpr int DEFAULT_NAVIGATION_RATE = 1;
-constexpr int DEFAULT_TIME_REF = 0;
-
-/** Error Handling */
-constexpr int INVALID_YEAR_FLAG = 0xBEEF;
-static constexpr int INVALID_SYNC_FLAG = 255;
 
 struct alignas(128) PVT_data
 {
@@ -195,7 +110,7 @@ class GPS
 {
 public:
     explicit GPS(int16_t currentYear, UART_HandleTypeDef *huart);
-    PVT_data GetPvt();
+    PVT_data get_pvt();
 
 private:
     int16_t currentYear_;
@@ -203,9 +118,9 @@ private:
     UBX ubx_;
     UART_HandleTypeDef *m_huart_;
 
-    void ubxSetup();
-    bool writeUbxMessage(UBX::UBX_message &message) const;
-    UBX::UBX_message readUbxMessage(uint16_t messageSize);
+    void ubx_setup();
+    bool write_ubx_message(UBX::UBX_message &message) const;
+    UBX::UBX_message read_ubx_message(uint16_t messageSize);
 
     static double bytes_to_double(const uint8_t *little_endian_bytes);
     static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);

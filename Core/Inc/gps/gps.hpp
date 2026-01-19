@@ -145,7 +145,7 @@ constexpr int DEFAULT_TIME_REF = 0;
 constexpr int INVALID_YEAR_FLAG = 0xBEEF;
 static constexpr int INVALID_SYNC_FLAG = 255;
 
-struct alignas(128) PVTData
+struct alignas(128) PVT_data
 {
     // Time Information
     uint16_t year;                        // Year (UTC)
@@ -191,28 +191,21 @@ struct alignas(128) PVTData
     float magnetDeclinationAccuracy;     // Declination accuracy (degrees * 1e2)
 };
 
-struct alignas(4) MeasurementParams
-{
-    uint16_t measurementPeriodMillis = DEFAULT_UPDATE_MILLS;
-    uint8_t navigationRate = DEFAULT_NAVIGATION_RATE;
-    uint8_t timeref = DEFAULT_TIME_REF;
-};
-
 class GPS
 {
 public:
     explicit GPS(int16_t currentYear, UART_HandleTypeDef *huart);
-    PVTData GetPvt();
+    PVT_data GetPvt();
 
 private:
     int16_t currentYear_;
-    PVTData pvtData_;
+    PVT_data pvtData_;
     UBX ubx_;
     UART_HandleTypeDef *m_huart_;
 
     void ubxSetup();
-    bool writeUbxMessage(UBX::UbxMessage &message) const;
-    UBX::UbxMessage readUbxMessage(uint16_t messageSize);
+    bool writeUbxMessage(UBX::UBX_message &message) const;
+    UBX::UBX_message readUbxMessage(uint16_t messageSize);
 
     static double bytes_to_double(const uint8_t *little_endian_bytes);
     static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);

@@ -33,7 +33,7 @@ GPS::GPS(int16_t currentYear, UART_HandleTypeDef *huart)
 void GPS::ubxSetup()
 {
     // Send UART configuration
-    UBX::UbxMessage
+    UBX::UBX_message
     setupMessage { .msgClass { UBX::MsgClass::cfg }, .msgID { UBX::cfg_prt },
             .payloadLength { 20 }, .payload = { 0x01,					// PORT
                     0x00,						// Reserved0
@@ -45,20 +45,20 @@ void GPS::ubxSetup()
                     0x00, 0x00,					// reserved4
                     0x00, 0x00 					// reserved5
                     } };
-    ubx_.ComputeChecksum(setupMessage);
+    ubx_.compute_checksum(setupMessage);
     bool result = writeUbxMessage(setupMessage);
     if (!result) {
         exit(-1);
     }
 
     // Set Measurement Frequency
-    UBX::UbxMessage
+    UBX::UBX_message
     setupMeasurementFrequencyMessage { .msgClass { UBX::MsgClass::cfg }, .msgID
             { UBX::cfg_rate }, .payloadLength { 6 }, .payload = { 0xE8, 0x03, // measRate
             0x01, 0x00,  // navRate
             0x00, 0x00   // timeRef
             } };
-    ubx_.ComputeChecksum(setupMeasurementFrequencyMessage);
+    ubx_.compute_checksum(setupMeasurementFrequencyMessage);
     result = writeUbxMessage(setupMeasurementFrequencyMessage);
     if (!result) {
         exit(-1);
@@ -70,7 +70,7 @@ void GPS::ubxSetup()
  *
  * @return  true if the message was successfully written, false otherwise.
  */
-bool GPS::writeUbxMessage(UBX::UbxMessage &message) const
+bool GPS::writeUbxMessage(UBX::UBX_message &message) const
 {
     std::vector < uint8_t > tempBuf;
     tempBuf.push_back(message.sync1);
@@ -100,10 +100,10 @@ bool GPS::writeUbxMessage(UBX::UbxMessage &message) const
  *
  * @return  The read UBX message.
  */
-UBX::UbxMessage GPS::readUbxMessage(uint16_t messageSize)
+UBX::UBX_message GPS::readUbxMessage(uint16_t messageSize)
 {
     std::vector < uint8_t > message(messageSize);
-    UBX::UbxMessage badMsg = { INVALID_SYNC_FLAG };
+    UBX::UBX_message badMsg = { INVALID_SYNC_FLAG };
     HAL_StatusTypeDef status = HAL_UART_Receive(m_huart_, message.data(),
             messageSize, DEFAULT_TIMEOUT);
     if (status == HAL_ERROR) {
@@ -111,7 +111,7 @@ UBX::UbxMessage GPS::readUbxMessage(uint16_t messageSize)
     }
 
     if (message[0] == UBX::sync_char_1 && message[1] == UBX::sync_char_2) {
-        UBX::UbxMessage ubxMsg {};
+        UBX::UBX_message ubxMsg {};
         ubxMsg.sync1 = message[0];
         ubxMsg.sync2 = message[1];
         ubxMsg.msgClass = static_cast<UBX::MsgClass>(message[2]);
@@ -138,10 +138,10 @@ UBX::UbxMessage GPS::readUbxMessage(uint16_t messageSize)
  *
  * @return  The PVTData structure containing GPS-related information.
  */
-PVTData GPS::GetPvt()
+PVT_data GPS::GetPvt()
 {
     uint16_t messageSize { 94 };
-    UBX::UbxMessage message = readUbxMessage(messageSize);
+    UBX::UBX_message message = readUbxMessage(messageSize);
 
     if (message.sync1 != INVALID_SYNC1_FLAG) {
         pvtData_.year = u2_to_int(

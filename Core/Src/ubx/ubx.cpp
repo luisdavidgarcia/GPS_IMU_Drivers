@@ -4,7 +4,7 @@
  * @brief   Calculate the checksum values (checksumA and checksumB) for a UBX message
  * @param 	Message to calculate the checksum for
  */
-void UBX::ComputeChecksum(UbxMessage &message)
+void UBX::compute_checksum(UBX_message &message)
 {
     message.checksumA = static_cast<uint8_t>(message.msgClass);
     message.checksumB = message.checksumA;

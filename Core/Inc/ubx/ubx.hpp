@@ -90,7 +90,7 @@ public:
         time_only_fix = 5,
     };
 
-    struct UbxMessage
+    struct UBX_message
     {
         uint8_t sync1
             { sync_char_1 };
@@ -110,7 +110,7 @@ public:
             { 0 };
     };
 
-    void ComputeChecksum(UbxMessage &message);
+    void compute_checksum(UBX_message &message);
 };
 
 #endif // UBX_HPP

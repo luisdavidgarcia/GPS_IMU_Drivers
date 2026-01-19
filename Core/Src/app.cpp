@@ -11,7 +11,7 @@
 // All C++ Includes must go here for C not to freak out
 
 // Main Cpp event loop to run application
-void app_main_CPP(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
+void CPP_app_main(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
 {
     IMU imu
         { hi2c1 };
@@ -27,8 +27,8 @@ void app_main_CPP(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
 // Define all C function calls from main.c below
 extern "C"
 {
-    void app_main_C(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
+    void C_app_main(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
     {
-        app_main_CPP(hi2c1, huart4);
+        CPP_app_main(hi2c1, huart4);
     }
 }

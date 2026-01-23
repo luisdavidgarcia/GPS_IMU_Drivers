@@ -89,7 +89,15 @@ void GTU7::ubx_setup()
             exit(-1);
         }
 
-        UBX::UBX_message navigationStatus = read_ubx_message(0);
+        UBX::UBX_message navigationStatus = read_ubx_message(24);
+        if (navigationStatus.sync1 == invalid_sync_flag) {
+            exit(-1);
+        }
+
+        uint32_t flags = navigationStatus.payload[5];
+        if (flags & 0x1) {
+            is_navigation_good = true;
+        }
     }
 }
 

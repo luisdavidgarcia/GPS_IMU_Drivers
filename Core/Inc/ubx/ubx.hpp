@@ -38,14 +38,14 @@
 #include <vector>
 #include <array>
 
-class UBX
+namespace UBX
 {
-public:
     //********* SYNC CHAR SECTION **********
     static constexpr uint8_t sync_char_1 = 0xB5;
     static constexpr uint8_t sync_char_2 = 0x62;
 
     //********* NAV MESSAGE SECTION **********
+    static constexpr uint8_t nav_status = 0x03;
     static constexpr uint8_t nav_pvt = 0x07;
 
     //********* ACK MESSAGE SECTION **********

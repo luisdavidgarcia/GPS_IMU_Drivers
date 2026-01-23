@@ -1,11 +1,11 @@
-#include <mpu9250_imu/mpu9250_imu.hpp>
+#include <mpu9250/mpu9250.hpp>
 
 /**
  * @brief   Constructor for the IMU class.
  *
  * Takes the HAL I2C Handle
  */
-IMU::IMU(I2C_HandleTypeDef *t_hi2c)
+MPU9250::MPU9250(I2C_HandleTypeDef *t_hi2c)
         : m_hi2c_(t_hi2c)
 {
     begin();
@@ -14,7 +14,7 @@ IMU::IMU(I2C_HandleTypeDef *t_hi2c)
 /**
  * @brief Constructor for the IMU class that accepts an address
  */
-IMU::IMU(I2C_HandleTypeDef *t_hi2c, uint8_t t_mpu9250_address)
+MPU9250::MPU9250(I2C_HandleTypeDef *t_hi2c, uint8_t t_mpu9250_address)
         : m_hi2c_(t_hi2c), m_mpu9250_address_(t_mpu9250_address)
 {
     begin();
@@ -26,7 +26,7 @@ IMU::IMU(I2C_HandleTypeDef *t_hi2c, uint8_t t_mpu9250_address)
  * Sets up the IMU sensor by configuring registers and settings
  * for accelerometer, gyroscope, and magnetometer communication.
  */
-void IMU::begin() const
+void MPU9250::begin() const
 {
     // Reset the IMU
     uint8_t reset = 0x80;
@@ -112,14 +112,14 @@ void IMU::begin() const
  *          magnetometer[1] = <read magnetometer Y value>;
  *          magnetometer[2] = <read magnetometer Z value>;
  */
-void IMU::Read()
+void MPU9250::read()
 {
     read_accelerometer();
     read_gyroscope();
     read_magnetometer();
 }
 
-void IMU::read_accelerometer()
+void MPU9250::read_accelerometer()
 {
     /* Read accelerometer data (Big Endian Order) */
     uint8_t raw_accel_data[6] =
@@ -140,7 +140,7 @@ void IMU::read_accelerometer()
             | (raw_accel_data[5] & byte_mask));
 }
 
-void IMU::read_gyroscope()
+void MPU9250::read_gyroscope()
 {
     /* Read gyroscope data (Big Endian Order) */
     uint8_t raw_gyro_data[6] =
@@ -161,7 +161,7 @@ void IMU::read_gyroscope()
             | (raw_gyro_data[5] & byte_mask));
 }
 
-void IMU::read_magnetometer()
+void MPU9250::read_magnetometer()
 {
     /* Read magnetometer data one-burst (Little Endian Order) */
     uint8_t st1 = 0;

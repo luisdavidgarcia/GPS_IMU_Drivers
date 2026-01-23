@@ -20,15 +20,15 @@
  *       documentation for further details on usage and customization.
  */
 
-#ifndef IMU_HPP
-#define IMU_HPP
+#ifndef MPU9250_HPP
+#define MPU9250_HPP
 
 extern "C"
 {
 #include "stm32l4xx_hal.h"
 }
 
-#include <mpu9250_imu/mpu9250_register_map.hpp>
+#include <mpu9250/mpu9250_register_map.hpp>
 
 #include <cstdint>
 #include <ctime>
@@ -78,13 +78,13 @@ struct Scaled_mag_ut
     float z; // µT
 };
 
-class IMU
+class MPU9250
 {
 public:
-    explicit IMU(I2C_HandleTypeDef *t_hi2c);
-    IMU(I2C_HandleTypeDef *t_hi2c, uint8_t t_mpu9250_address);
+    explicit MPU9250(I2C_HandleTypeDef *t_hi2c);
+    MPU9250(I2C_HandleTypeDef *t_hi2c, uint8_t t_mpu9250_address);
 
-    void Read();
+    void read();
 
     const Accel_mps2& get_raw_acceleration() const
     {
@@ -164,4 +164,4 @@ private:
     void read_magnetometer();
 };
 
-#endif // IMU_HPP
+#endif // MPU9250_IMU_HPP

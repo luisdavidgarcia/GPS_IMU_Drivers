@@ -4,8 +4,8 @@
  *      Author: Luis
  */
 
-#include <mpu9250_imu/mpu9250_imu.hpp>
-#include <gps/gps.hpp>
+#include <gtu7/gtu7.hpp>
+#include <mpu9250/mpu9250.hpp>
 #include "app.hpp"
 
 // All C++ Includes must go here for C not to freak out
@@ -13,14 +13,15 @@
 // Main Cpp event loop to run application
 void CPP_app_main(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
 {
-    IMU imu
+    MPU9250 imu
         { hi2c1 };
 
-    GPS gps
+    GTU7 gps
         { 2026, huart4 };
 
     while (1) {
-        imu.Read();
+//        imu.read();
+        gps.get_pvt();
     }
 }
 

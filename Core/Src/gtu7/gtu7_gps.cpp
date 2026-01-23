@@ -4,14 +4,14 @@
  *  Created on: Jan 16, 2026
  */
 
-#include "gps/gps.hpp"
+#include "gtu7/gtu7.hpp"
 
 /**
  * @brief   Constructor for the GPS class.
  *
  * Initializes the GPS module communication, sets message send rates, and measurement frequencies.
  */
-GPS::GPS(int16_t currentYear, UART_HandleTypeDef *huart)
+GTU7::GTU7(int16_t currentYear, UART_HandleTypeDef *huart)
         : currentYear_(currentYear), pvtData_ {}, m_huart_(huart)
 {
 
@@ -30,7 +30,7 @@ GPS::GPS(int16_t currentYear, UART_HandleTypeDef *huart)
  *
  * Sends a UBX configuration message to the GPS module to use UBX protocol only.
  */
-void GPS::ubx_setup()
+void GTU7::ubx_setup()
 {
     // Send UART configuration
     UBX::UBX_message setupMessage {
@@ -49,7 +49,7 @@ void GPS::ubx_setup()
                     0x00, 0x00 					// reserved5
                     },
     };
-    ubx_.compute_checksum(setupMessage);
+    UBX::compute_checksum(setupMessage);
     bool result = write_ubx_message(setupMessage);
     if (!result) {
         exit(-1);
@@ -57,15 +57,39 @@ void GPS::ubx_setup()
 
     // Set Measurement Frequency
     UBX::UBX_message
-    setupMeasurementFrequencyMessage { .msg_class { UBX::Msg_class::cfg }, .msg_id
-            { UBX::cfg_rate }, .payload_length { 6 }, .payload = { 0xE8, 0x03, // measRate
+    setupMeasurementFrequencyMessage {
+        .msg_class { UBX::Msg_class::cfg },
+        .msg_id { UBX::cfg_rate },
+        .payload_length { 6 },
+        .payload = {
+            0xE8, 0x03,  // measRate
             0x01, 0x00,  // navRate
             0x00, 0x00   // timeRef
-            } };
-    ubx_.compute_checksum(setupMeasurementFrequencyMessage);
+        }
+    };
+    UBX::compute_checksum(setupMeasurementFrequencyMessage);
     result = write_ubx_message(setupMeasurementFrequencyMessage);
     if (!result) {
         exit(-1);
+    }
+
+    // Verify the navigation status is clear
+    bool is_navigation_good{false};
+    while (!is_navigation_good) {
+        UBX::UBX_message
+        checkNavigationStatus {
+            .msg_class { UBX::Msg_class::nav },
+            .msg_id { UBX::nav_status },
+            .payload_length { 0 },
+            .payload = {}
+        };
+        UBX::compute_checksum(checkNavigationStatus);
+        result = write_ubx_message(checkNavigationStatus);
+        if (!result) {
+            exit(-1);
+        }
+
+        UBX::UBX_message navigationStatus = read_ubx_message(0);
     }
 }
 
@@ -74,7 +98,7 @@ void GPS::ubx_setup()
  *
  * @return  true if the message was successfully written, false otherwise.
  */
-bool GPS::write_ubx_message(UBX::UBX_message &message) const
+bool GTU7::write_ubx_message(UBX::UBX_message &message) const
 {
     std::vector < uint8_t > tempBuf;
     tempBuf.push_back(message.sync1);
@@ -92,7 +116,6 @@ bool GPS::write_ubx_message(UBX::UBX_message &message) const
     HAL_StatusTypeDef status = HAL_UART_Transmit(m_huart_, tempBuf.data(),
             tempBuf.size(), default_timeout);
     if (status == HAL_ERROR) {
-        perror("Failed to write to I2C device");
         return false;
     }
 
@@ -104,12 +127,12 @@ bool GPS::write_ubx_message(UBX::UBX_message &message) const
  *
  * @return  The read UBX message.
  */
-UBX::UBX_message GPS::read_ubx_message(uint16_t messageSize)
+UBX::UBX_message GTU7::read_ubx_message(uint16_t messageSize)
 {
     std::vector < uint8_t > message(messageSize);
     UBX::UBX_message badMsg = { invalid_sync_flag };
     HAL_StatusTypeDef status = HAL_UART_Receive(m_huart_, message.data(),
-            messageSize, default_timeout);
+            messageSize, 5000);
     if (status == HAL_ERROR) {
         return badMsg;
     }
@@ -120,16 +143,28 @@ UBX::UBX_message GPS::read_ubx_message(uint16_t messageSize)
         ubxMsg.sync2 = message[1];
         ubxMsg.msg_class = static_cast<UBX::Msg_class>(message[2]);
         ubxMsg.msg_id = message[3];
+
         ubxMsg.payload_length = (message[5] << byte_shift_amount | message[4]);
-        if (ubxMsg.payload_length > messageSize) {
+        if (ubxMsg.payload_length + 8 != messageSize) {
             return badMsg;
         }
+
         uint8_t payload_offset = 6;
+        ubxMsg.payload.resize(ubxMsg.payload_length);
         std::copy(message.begin() + payload_offset,
                 message.begin() + payload_offset + ubxMsg.payload_length,
                 ubxMsg.payload.begin());
-        ubxMsg.checksum_a = message[message.size() - 2];
-        ubxMsg.checksum_b = message[message.size() - 1];
+
+        size_t checksum_index = 6 + ubxMsg.payload_length;
+        uint8_t checksum_a = message[checksum_index];
+        uint8_t checksum_b = message[checksum_index + 1];
+
+        // Verify the checksum before adding
+        compute_checksum(ubxMsg);
+        if ((checksum_a != ubxMsg.checksum_a) ||
+                (checksum_b != ubxMsg.checksum_b)) {
+            return badMsg;
+        }
 
         return ubxMsg;
     }
@@ -137,12 +172,13 @@ UBX::UBX_message GPS::read_ubx_message(uint16_t messageSize)
     return badMsg;
 }
 
+// TODO: Replaced this with the UBLOX-6 standard
 /**
  * @brief   Retrieve Position-Velocity-Time (PVT) data from the GPS module.
  *
  * @return  The PVTData structure containing GPS-related information.
  */
-PVT_data GPS::get_pvt()
+PVT_data GTU7::get_pvt()
 {
     uint16_t messageSize { 94 };
     UBX::UBX_message message = read_ubx_message(messageSize);
@@ -237,7 +273,7 @@ PVT_data GPS::get_pvt()
  * @param   little_endian_bytes The input byte array.
  * @return  The converted signed 16-bit integer.
  */
-int16_t GPS::i2_to_int(std::span<const uint8_t, 2> bytes)
+int16_t GTU7::i2_to_int(std::span<const uint8_t, 2> bytes)
 {
     auto byte0 = static_cast<uint16_t>(bytes[0]);
     auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
@@ -251,7 +287,7 @@ int16_t GPS::i2_to_int(std::span<const uint8_t, 2> bytes)
  * @param   little_endian_bytes The input byte array.
  * @return  The converted unsigned 16-bit integer.
  */
-uint16_t GPS::u2_to_int(std::span<const uint8_t, 2> bytes)
+uint16_t GTU7::u2_to_int(std::span<const uint8_t, 2> bytes)
 {
     auto byte0 = static_cast<uint16_t>(bytes[0]);
     auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
@@ -259,7 +295,7 @@ uint16_t GPS::u2_to_int(std::span<const uint8_t, 2> bytes)
     return byte1 | byte0;
 }
 
-double GPS::bytes_to_double(const uint8_t *little_endian_bytes)
+double GTU7::bytes_to_double(const uint8_t *little_endian_bytes)
 {
     // Assuming little_endian_bytes is a representation of a double
     // If it's not, you'll need to adjust the conversion logic accordingly
@@ -274,7 +310,7 @@ double GPS::bytes_to_double(const uint8_t *little_endian_bytes)
  * @param   little_endian_bytes The input byte array.
  * @return  The converted signed 32-bit integer.
  */
-int32_t GPS::i4_to_int(std::span<const uint8_t, 4> bytes)
+int32_t GTU7::i4_to_int(std::span<const uint8_t, 4> bytes)
 {
     auto byte0 = static_cast<uint32_t>(bytes[0]);
     auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;
@@ -290,7 +326,7 @@ int32_t GPS::i4_to_int(std::span<const uint8_t, 4> bytes)
  * @param   little_endian_bytes The input byte array.
  * @return  The converted unsigned 32-bit integer.
  */
-uint32_t GPS::u4_to_int(std::span<const uint8_t, 4> bytes)
+uint32_t GTU7::u4_to_int(std::span<const uint8_t, 4> bytes)
 {
     auto byte0 = static_cast<uint32_t>(bytes[0]);
     auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;

@@ -1,5 +1,5 @@
-#ifndef GPS_CONSTANTS_HPP
-#define GPS_CONSTANTS_HPP
+#ifndef GTU7_CONSTANTS_HPP
+#define GTU7_CONSTANTS_HPP
 
 #include <cstdint>
 
@@ -87,4 +87,4 @@ constexpr int invalid_year_flag = 0xbeef;
 static constexpr int invalid_sync_flag = 255;
 
 
-#endif // GPS_CONSTANTS_HPP
+#endif // GTU7_CONSTANTS_HPP

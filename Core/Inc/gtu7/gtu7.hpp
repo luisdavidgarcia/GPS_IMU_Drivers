@@ -1,46 +1,11 @@
 /*
- * gps.hpp
+ * gtu7.hpp
  *
  *  Created on: Jan 16, 2026
  */
 
-/*
- * GPS.h - Header file for GPS module integration
- *
- * This header file defines the interface for interacting with a GPS module
- * over the I2C communication protocol. It provides functions and data structures
- * to retrieve GPS-related information, including location, time, velocity, and more.
- * The code in this header is designed to work with a specific GPS module and may
- * require configuration and adaptation for different hardware or use cases.
- *
- *
- * Dependencies:
- * - ubx/ubx_msg.hpp: Defines UBX message structures for communication with the GPS module.
- * - fcntl.h, unistd.h, i2c/smbus.h, linux/i2c-dev.h, linux/i2c.h: Required for I2C communication.
- * - cstdint, sys/ioctl.h, string, chrono, thread, vector, cstring: Standard C++ libraries.
- *
- * Constants and Definitions:
- * - Various constants for I2C addresses, register addresses, timeouts, and default values.
- *
- * Data Structures:
- * - PVTData: A structure to hold GPS-related data, including time, coordinates, accuracy,
- *   velocity, and more.
- *
- * Class:
- * - Gps: A class that encapsulates GPS functionality, including I2C communication,
- *   message handling, and data retrieval.
- *
- * Usage:
- * - Include this header file in your C++ project to interact with a GPS module.
- * - Instantiate the Gps class to communicate with the GPS module and retrieve data.
- *
- * Note: This code is designed for the GT-U7 GPS, but may be adapted to other modules.
- * 			It is also UART based and thus is a poll based mechanism of transmit
- * 			and receive for the data.
- */
-
-#ifndef GPS_HPP
-#define GPS_HPP
+#ifndef GTU7_HPP
+#define GTU7_HPP
 
 extern "C"
 {
@@ -48,8 +13,8 @@ extern "C"
 }
 
 #include "ubx/ubx.hpp"
-#include "mpu9250_imu/mpu9250_register_map.hpp"
-#include "gps/gps_constants.hpp"
+#include <mpu9250/mpu9250_register_map.hpp>
+#include <gtu7/gtu7_constants.hpp>
 
 #include <fcntl.h>
 #include <span>
@@ -106,16 +71,15 @@ struct alignas(128) PVT_data
     float magnetDeclinationAccuracy;     // Declination accuracy (degrees * 1e2)
 };
 
-class GPS
+class GTU7
 {
 public:
-    explicit GPS(int16_t currentYear, UART_HandleTypeDef *huart);
+    explicit GTU7(int16_t currentYear, UART_HandleTypeDef *huart);
     PVT_data get_pvt();
 
 private:
     int16_t currentYear_;
     PVT_data pvtData_;
-    UBX ubx_;
     UART_HandleTypeDef *m_huart_;
 
     void ubx_setup();
@@ -130,5 +94,5 @@ private:
 
 };
 
-#endif // GPS_HPP
+#endif // GTU7_HPP
 

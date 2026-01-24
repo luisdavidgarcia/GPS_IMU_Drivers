@@ -5,4 +5,4 @@ Debug/
 .project
 .settings/
 GPS_IMU_Drivers Debug.launch
-
+.osx.project

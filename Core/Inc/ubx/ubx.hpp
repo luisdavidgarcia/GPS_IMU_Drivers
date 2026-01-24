@@ -45,8 +45,9 @@ namespace UBX
     static constexpr uint8_t sync_char_2 = 0x62;
 
     //********* NAV MESSAGE SECTION **********
+    static constexpr uint8_t nav_posllh = 0x02;
     static constexpr uint8_t nav_status = 0x03;
-    static constexpr uint8_t nav_pvt = 0x07;
+    static constexpr uint8_t nav_velned = 0x12;
 
     //********* ACK MESSAGE SECTION **********
     static constexpr uint8_t ack_ack = 0x01;
@@ -57,6 +58,13 @@ namespace UBX
     static constexpr uint8_t cfg_msg = 0x01;
     static constexpr uint8_t cfg_inf = 0x02;
     static constexpr uint8_t cfg_rate = 0x08;
+
+    struct Checksum {
+        uint8_t a{0};
+        uint8_t b{0};
+
+        bool operator==(const Checksum&) const = default;
+    };
 
     enum class Msg_class : uint8_t
     {
@@ -76,27 +84,28 @@ namespace UBX
         hnr = 0x28,
     };
 
-    struct UBX_message
+    struct Header
     {
-        uint8_t sync1
-            { sync_char_1 };
-        uint8_t sync2
-            { sync_char_2 };
         Msg_class msg_class
             { Msg_class::nav };
         uint8_t msg_id
-            { cfg_prt };
+            { 0 };
         uint16_t payload_length
-            { 0 };
-        std::vector<uint8_t> payload
-            { };
-        uint8_t checksum_a
-            { 0 };
-        uint8_t checksum_b
             { 0 };
     };
 
-    void compute_checksum(UBX_message &message);
+    // Exclude SYNC1 and SYNC2 to save space since they are always constant
+    struct Message
+    {
+        Header header
+            { };
+        std::vector<uint8_t> payload
+            { };
+        Checksum checksum
+            { 0 };
+    };
+
+    Checksum compute_checksum(Message &message);
 };
 
 #endif // UBX_HPP

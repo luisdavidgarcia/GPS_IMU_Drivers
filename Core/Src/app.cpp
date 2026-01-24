@@ -17,7 +17,7 @@ void CPP_app_main(I2C_HandleTypeDef *hi2c1, UART_HandleTypeDef *huart4)
         { hi2c1 };
 
     GTU7 gps
-        { 2026, huart4 };
+        { huart4 };
 
     while (1) {
 //        imu.read();

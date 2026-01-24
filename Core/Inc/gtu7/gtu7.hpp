@@ -74,19 +74,17 @@ struct alignas(128) PVT_data
 class GTU7
 {
 public:
-    explicit GTU7(int16_t currentYear, UART_HandleTypeDef *huart);
+    explicit GTU7(UART_HandleTypeDef *huart);
     PVT_data get_pvt();
 
 private:
-    int16_t currentYear_;
     PVT_data pvtData_;
     UART_HandleTypeDef *m_huart_;
 
     void ubx_setup();
-    bool write_ubx_message(UBX::UBX_message &message) const;
-    UBX::UBX_message read_ubx_message(uint16_t messageSize);
+    bool write_ubx_message(UBX::Message &message) const;
+    bool read_ubx_message(UBX::Message &message, uint16_t messageSize);
 
-    static double bytes_to_double(const uint8_t *little_endian_bytes);
     static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);
     static uint16_t u2_to_int(std::span<const uint8_t, 2> bytes);
     static int32_t i4_to_int(std::span<const uint8_t, 4> bytes);

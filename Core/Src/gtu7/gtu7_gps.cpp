@@ -11,15 +11,9 @@
  *
  * Initializes the GPS module communication, sets message send rates, and measurement frequencies.
  */
-GTU7::GTU7(int16_t currentYear, UART_HandleTypeDef *huart)
-        : currentYear_(currentYear), pvtData_ {}, m_huart_(huart)
+GTU7::GTU7(UART_HandleTypeDef *huart)
+        : pvtData_ {}, m_huart_(huart)
 {
-
-    if (currentYear == default_year) {
-        printf("Error: Current year is not set.\n");
-        exit(-1);
-    }
-
     // Enable UART here for GPS
     // Set baud_rate, message rate, measurement frequency
     ubx_setup();
@@ -33,10 +27,12 @@ GTU7::GTU7(int16_t currentYear, UART_HandleTypeDef *huart)
 void GTU7::ubx_setup()
 {
     // Send UART configuration
-    UBX::UBX_message setupMessage {
-            .msg_class { UBX::Msg_class::cfg },
-            .msg_id { UBX::cfg_prt },
-            .payload_length { 20 },
+    UBX::Message setupMessage {
+            .header {
+                .msg_class { UBX::Msg_class::cfg },
+                .msg_id { UBX::cfg_prt },
+                .payload_length { 20 },
+            },
             .payload = {
                     0x01,					    // PORT
                     0x00,						// Reserved0
@@ -49,18 +45,24 @@ void GTU7::ubx_setup()
                     0x00, 0x00 					// reserved5
                     },
     };
-    UBX::compute_checksum(setupMessage);
-    bool result = write_ubx_message(setupMessage);
-    if (!result) {
-        exit(-1);
+    setupMessage.checksum = UBX::compute_checksum(setupMessage);
+    if (!write_ubx_message(setupMessage)) {
+        return;
+    }
+    // Get the ACK
+    UBX::Message ack_message{};
+    while (!read_ubx_message(ack_message, 10)) {
+        HAL_Delay(1000);
     }
 
     // Set Measurement Frequency
-    UBX::UBX_message
+    UBX::Message
     setupMeasurementFrequencyMessage {
-        .msg_class { UBX::Msg_class::cfg },
-        .msg_id { UBX::cfg_rate },
-        .payload_length { 6 },
+        .header {
+            .msg_class { UBX::Msg_class::cfg },
+            .msg_id { UBX::cfg_rate },
+            .payload_length { 6 },
+        },
         .payload = {
             0xE8, 0x03,  // measRate
             0x01, 0x00,  // navRate
@@ -68,36 +70,14 @@ void GTU7::ubx_setup()
         }
     };
     UBX::compute_checksum(setupMeasurementFrequencyMessage);
-    result = write_ubx_message(setupMeasurementFrequencyMessage);
-    if (!result) {
-        exit(-1);
+    if (!write_ubx_message(setupMeasurementFrequencyMessage)) {
+        return;
     }
 
-    // Verify the navigation status is clear
-    bool is_navigation_good{false};
-    while (!is_navigation_good) {
-        UBX::UBX_message
-        checkNavigationStatus {
-            .msg_class { UBX::Msg_class::nav },
-            .msg_id { UBX::nav_status },
-            .payload_length { 0 },
-            .payload = {}
-        };
-        UBX::compute_checksum(checkNavigationStatus);
-        result = write_ubx_message(checkNavigationStatus);
-        if (!result) {
-            exit(-1);
-        }
-
-        UBX::UBX_message navigationStatus = read_ubx_message(24);
-        if (navigationStatus.sync1 == invalid_sync_flag) {
-            exit(-1);
-        }
-
-        uint32_t flags = navigationStatus.payload[5];
-        if (flags & 0x1) {
-            is_navigation_good = true;
-        }
+    // Get the ACK
+    ack_message = {};
+    while (!read_ubx_message(ack_message, 10)) {
+        HAL_Delay(1000);
     }
 }
 
@@ -106,24 +86,25 @@ void GTU7::ubx_setup()
  *
  * @return  true if the message was successfully written, false otherwise.
  */
-bool GTU7::write_ubx_message(UBX::UBX_message &message) const
+bool GTU7::write_ubx_message(UBX::Message &message) const
 {
     std::vector < uint8_t > tempBuf;
-    tempBuf.push_back(message.sync1);
-    tempBuf.push_back(message.sync2);
-    tempBuf.push_back(static_cast<uint8_t>(message.msg_class));
-    tempBuf.push_back(message.msg_id);
-    tempBuf.push_back(message.payload_length & byte_mask);
-    tempBuf.push_back(message.payload_length >> byte_shift_amount);
-    for (int i = 0; i < message.payload_length; i++) {
+    tempBuf.reserve(8 + message.header.payload_length);
+    tempBuf.push_back(UBX::sync_char_1);
+    tempBuf.push_back(UBX::sync_char_2);
+    tempBuf.push_back(static_cast<uint8_t>(message.header.msg_class));
+    tempBuf.push_back(message.header.msg_id);
+    tempBuf.push_back(message.header.payload_length & byte_mask);
+    tempBuf.push_back(message.header.payload_length >> byte_shift_amount);
+    for (int i = 0; i < message.header.payload_length; i++) {
         tempBuf.push_back(message.payload.at(i));
     }
-    tempBuf.push_back(message.checksum_a);
-    tempBuf.push_back(message.checksum_b);
+    tempBuf.push_back(message.checksum.a);
+    tempBuf.push_back(message.checksum.b);
 
     HAL_StatusTypeDef status = HAL_UART_Transmit(m_huart_, tempBuf.data(),
             tempBuf.size(), default_timeout);
-    if (status == HAL_ERROR) {
+    if (status != HAL_OK) {
         return false;
     }
 
@@ -135,49 +116,45 @@ bool GTU7::write_ubx_message(UBX::UBX_message &message) const
  *
  * @return  The read UBX message.
  */
-UBX::UBX_message GTU7::read_ubx_message(uint16_t messageSize)
+bool GTU7::read_ubx_message(UBX::Message& message, uint16_t messageSize)
 {
-    std::vector < uint8_t > message(messageSize);
-    UBX::UBX_message badMsg = { invalid_sync_flag };
-    HAL_StatusTypeDef status = HAL_UART_Receive(m_huart_, message.data(),
-            messageSize, 5000);
-    if (status == HAL_ERROR) {
-        return badMsg;
+
+    // Read the Header (6 Bytes) (sync 1, sync 2, msgClass, msgID, length (2 bytes))
+    // Read the payload based on length
+    // Read the checksum
+    // Verify the checksum
+    std::vector<uint8_t> buffer(messageSize);
+    auto status = HAL_UART_Receive(m_huart_, buffer.data(), messageSize, default_timeout);
+    if (status != HAL_OK) {
+        return false;
     }
 
-    if (message[0] == UBX::sync_char_1 && message[1] == UBX::sync_char_2) {
-        UBX::UBX_message ubxMsg {};
-        ubxMsg.sync1 = message[0];
-        ubxMsg.sync2 = message[1];
-        ubxMsg.msg_class = static_cast<UBX::Msg_class>(message[2]);
-        ubxMsg.msg_id = message[3];
+    if (buffer[0] == UBX::sync_char_1 && buffer[1] == UBX::sync_char_2) {
+        message.header.msg_class = static_cast<UBX::Msg_class>(buffer[2]);
+        message.header.msg_id = buffer[3];
 
-        ubxMsg.payload_length = (message[5] << byte_shift_amount | message[4]);
-        if (ubxMsg.payload_length + 8 != messageSize) {
-            return badMsg;
+        message.header.payload_length = (buffer[5] << byte_shift_amount | buffer[4]);
+        if (message.header.payload_length + 8 != messageSize) {
+            return false;
         }
 
         uint8_t payload_offset = 6;
-        ubxMsg.payload.resize(ubxMsg.payload_length);
-        std::copy(message.begin() + payload_offset,
-                message.begin() + payload_offset + ubxMsg.payload_length,
-                ubxMsg.payload.begin());
+        message.payload.resize(message.header.payload_length);
+        std::copy(buffer.begin() + payload_offset,
+                buffer.begin() + payload_offset + message.header.payload_length,
+                message.payload.begin());
 
-        size_t checksum_index = 6 + ubxMsg.payload_length;
-        uint8_t checksum_a = message[checksum_index];
-        uint8_t checksum_b = message[checksum_index + 1];
-
-        // Verify the checksum before adding
-        compute_checksum(ubxMsg);
-        if ((checksum_a != ubxMsg.checksum_a) ||
-                (checksum_b != ubxMsg.checksum_b)) {
-            return badMsg;
+        size_t checksum_index = 6 + message.header.payload_length;
+        message.checksum = {
+            buffer[checksum_index],
+            buffer[checksum_index + 1]
+        };
+        if (compute_checksum(message) == message.checksum) {
+            return true;
         }
-
-        return ubxMsg;
     }
 
-    return badMsg;
+    return false;
 }
 
 // TODO: Replaced this with the UBLOX-6 standard
@@ -188,91 +165,42 @@ UBX::UBX_message GTU7::read_ubx_message(uint16_t messageSize)
  */
 PVT_data GTU7::get_pvt()
 {
-    uint16_t messageSize { 94 };
-    UBX::UBX_message message = read_ubx_message(messageSize);
-
-    if (message.sync1 != invalid_sync1_flag) {
-        pvtData_.year = u2_to_int(
-                std::span<const uint8_t, 2>(&message.payload[4], 2));
-        if (pvtData_.year != currentYear_) {
-            pvtData_.year = invalid_year_flag;
-            return this->pvtData_;
-        }
-        pvtData_.month = message.payload[6];
-        pvtData_.day = message.payload[7];
-        pvtData_.hour = message.payload[8];
-        pvtData_.min = message.payload[9];
-        pvtData_.sec = message.payload[10];
-        uint8_t valid_flag = message.payload[11];
-
-        // Extract and clarify flags
-        pvtData_.validDateFlag =
-                (valid_flag & valid_date_flag) == valid_date_flag ? 1 : 0;
-        pvtData_.validTimeFlag =
-                (valid_flag & valid_time_flag) == valid_time_flag ? 1 : 0;
-        pvtData_.fullyResolved =
-                (valid_flag & fully_resolved_flag) == fully_resolved_flag ?
-                        1 : 0;
-        pvtData_.validMagFlag =
-                (valid_flag & valid_mag_flag) == valid_mag_flag ? 1 : 0;
-
-        // Extract GNSS fix and related data
-        pvtData_.gnssFix = message.payload[20];
-        memcpy(&pvtData_.fixStatusFlags, &message.payload[21], 2);
-        pvtData_.numberOfSatellites = message.payload[23];
-
-        // Extract longitude and latitude in degrees
-        pvtData_.longitude = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[24], 4)))
-                * longtitude_scale;
-        pvtData_.latitude = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[28], 4)))
-                * lattitude_scale;
-        pvtData_.height = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[32], 4));
-        pvtData_.heightMSL = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[36], 4));
-        // Extract horizontal and vertical accuracy in millimeters
-        pvtData_.horizontalAccuracy = u4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[40], 4));
-        pvtData_.verticalAccuracy = u4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[44], 4));
-        // Extract North East Down velocity in mm/s
-        pvtData_.velocityNorth = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[48], 4));
-        pvtData_.velocityEast = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[52], 4));
-        pvtData_.velocityDown = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[56], 4));
-        // Extract ground speed in mm/s and motion heading in degrees
-        pvtData_.groundSpeed = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[60], 4));
-        pvtData_.motionHeading = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[64], 4)))
-                * motion_heading_scale;
-        // Extract speed accuracy in mm/s and heading accuracy in degrees
-        pvtData_.speedAccuracy = u4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[68], 4));
-        pvtData_.motionHeadingAccuracy = static_cast<float>(u4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[72], 4)))
-                * motion_heading_accuracy_scale;
-        // Extract vehicle heading in degrees
-        pvtData_.vehicalHeading = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[84], 4)))
-                * vehicle_heading_scale;
-        // Extract magnetic declination and accuracy in degrees
-        pvtData_.magneticDeclination = static_cast<float>(i2_to_int(
-                std::span<const uint8_t, 2>(&message.payload[88], 4)))
-                * magnetic_declination_scale;
-        pvtData_.magnetDeclinationAccuracy = static_cast<float>(u2_to_int(
-                std::span<const uint8_t, 2>(&message.payload[90], 4)))
-                * magnetic_declination_accuracy_scale;
-
-        return this->pvtData_;
+    // First send a request
+    UBX::Message requestPosllh {
+        .header {
+            .msg_class { UBX::Msg_class::nav },
+            .msg_id { UBX::nav_posllh },
+            .payload_length { 0 },
+        },
+        .payload = {}
+    };
+    UBX::compute_checksum(requestPosllh);
+    if (!write_ubx_message(requestPosllh)) {
+        return pvtData_;
     }
 
-    pvtData_.year = invalid_year_flag;
-    return this->pvtData_;
+    // Now read the data
+    // TODO: Add 8 to default message size then add payload
+    UBX::Message message{};
+    if (read_ubx_message(message, 8 + 28)) {
+
+//        uint32_t iTOW = u4_to_int(std::span<const uint8_t, 4>(&message.payload[0], 4));
+        // Extract longitude and latitude in degrees
+        pvtData_.longitude = static_cast<float>(i4_to_int(
+                std::span<const uint8_t, 4>(&message.payload[4], 4)))
+                * longtitude_scale;
+        pvtData_.latitude = static_cast<float>(i4_to_int(
+                std::span<const uint8_t, 4>(&message.payload[8], 4)))
+                * lattitude_scale;
+        pvtData_.height = i4_to_int(
+                std::span<const uint8_t, 4>(&message.payload[12], 4));
+        pvtData_.heightMSL = i4_to_int(
+                std::span<const uint8_t, 4>(&message.payload[16], 4));
+
+        return pvtData_;
+    }
+
+    return pvtData_;
 }
 
 /**
@@ -301,15 +229,6 @@ uint16_t GTU7::u2_to_int(std::span<const uint8_t, 2> bytes)
     auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
 
     return byte1 | byte0;
-}
-
-double GTU7::bytes_to_double(const uint8_t *little_endian_bytes)
-{
-    // Assuming little_endian_bytes is a representation of a double
-    // If it's not, you'll need to adjust the conversion logic accordingly
-    double result = 0;
-    memcpy(&result, little_endian_bytes, sizeof(result));
-    return result * 1e-07;
 }
 
 /**

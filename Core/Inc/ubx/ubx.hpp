@@ -59,13 +59,6 @@ namespace UBX
     static constexpr uint8_t cfg_inf = 0x02;
     static constexpr uint8_t cfg_rate = 0x08;
 
-    struct Checksum {
-        uint8_t a{0};
-        uint8_t b{0};
-
-        bool operator==(const Checksum&) const = default;
-    };
-
     enum class Msg_class : uint8_t
     {
         nav = 0x01,
@@ -94,6 +87,13 @@ namespace UBX
             { 0 };
     };
 
+    struct Checksum {
+        uint8_t a{0};
+        uint8_t b{0};
+
+        bool operator==(const Checksum&) const = default;
+    };
+
     // Exclude SYNC1 and SYNC2 to save space since they are always constant
     struct Message
     {
@@ -102,7 +102,7 @@ namespace UBX
         std::vector<uint8_t> payload
             { };
         Checksum checksum
-            { 0 };
+            { };
     };
 
     Checksum compute_checksum(Message &message);

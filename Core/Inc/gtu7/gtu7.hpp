@@ -71,6 +71,9 @@ struct alignas(128) PVT_data
     float magnetDeclinationAccuracy;     // Declination accuracy (degrees * 1e2)
 };
 
+static constexpr uint8_t header_bytes = 6;
+static constexpr uint8_t checksum_bytes = 2;
+
 class GTU7
 {
 public:
@@ -78,17 +81,74 @@ public:
     PVT_data get_pvt();
 
 private:
-    PVT_data pvtData_;
     UART_HandleTypeDef *m_huart_;
+    PVT_data pvtData_;
 
     void ubx_setup();
-    bool write_ubx_message(UBX::Message &message) const;
-    bool read_ubx_message(UBX::Message &message, uint16_t messageSize);
+    void set_configuration();
+    void set_measurement_frequency();
+    void set_posllh();
+    void disable_nmea();
 
-    static int16_t i2_to_int(std::span<const uint8_t, 2> bytes);
-    static uint16_t u2_to_int(std::span<const uint8_t, 2> bytes);
-    static int32_t i4_to_int(std::span<const uint8_t, 4> bytes);
-    static uint32_t u4_to_int(std::span<const uint8_t, 4> bytes);
+    bool write_ubx_message(const UBX::Message& message) const;
+    bool read_ubx_message(UBX::Message& message);
+    bool wait_for_ack(uint8_t msg_id, uint32_t timeout_ms);
+
+    /**
+     * @brief   Convert a little-endian byte array to a signed 16-bit integer.
+     *
+     * @param   little_endian_bytes The input byte array.
+     * @return  The converted signed 16-bit integer.
+     */
+    static constexpr inline int16_t i2_to_int(std::span<const uint8_t, 2> bytes) noexcept {
+        auto byte0 = static_cast<uint16_t>(bytes[0]);
+        auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
+
+        return static_cast<int16_t>(byte1 | byte0);
+    }
+
+    /**
+     * @brief   Convert a little-endian byte array to an unsigned 16-bit integer.
+     *
+     * @param   little_endian_bytes The input byte array.
+     * @return  The converted unsigned 16-bit integer.
+     */
+    static constexpr inline uint16_t u2_to_int(std::span<const uint8_t, 2> bytes) noexcept {
+        auto byte0 = static_cast<uint16_t>(bytes[0]);
+        auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
+
+        return byte1 | byte0;
+    }
+
+    /**
+     * @brief   Convert a little-endian byte array to a signed 32-bit integer.
+     *
+     * @param   little_endian_bytes The input byte array.
+     * @return  The converted signed 32-bit integer.
+     */
+    static constexpr inline int32_t i4_to_int(std::span<const uint8_t, 4> bytes) noexcept {
+        auto byte0 = static_cast<uint32_t>(bytes[0]);
+        auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;
+        auto byte2 = static_cast<uint32_t>(bytes[2]) << half_word_shift_amount;
+        auto byte3 = static_cast<uint32_t>(bytes[3]) << three_byte_shift_amount;
+
+        return static_cast<int32_t>(byte3 | byte2 | byte1 | byte0);
+    }
+
+    /**
+     * @brief   Convert a little-endian byte array to an unsigned 32-bit integer.
+     *
+     * @param   little_endian_bytes The input byte array.
+     * @return  The converted unsigned 32-bit integer.
+     */
+    static constexpr inline uint32_t u4_to_int(std::span<const uint8_t, 4> bytes) noexcept {
+        auto byte0 = static_cast<uint32_t>(bytes[0]);
+        auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;
+        auto byte2 = static_cast<uint32_t>(bytes[2]) << half_word_shift_amount;
+        auto byte3 = static_cast<uint32_t>(bytes[3]) << three_byte_shift_amount;
+
+        return (byte3 | byte2 | byte1 | byte0);
+    }
 
 };
 

@@ -12,20 +12,17 @@
  * Initializes the GPS module communication, sets message send rates, and measurement frequencies.
  */
 GTU7::GTU7(UART_HandleTypeDef *huart)
-        : pvtData_ {}, m_huart_(huart)
+        : m_huart_(huart), pvtData_ {}
 {
     // Enable UART here for GPS
     // Set baud_rate, message rate, measurement frequency
+    HAL_Delay(1000);
+
+    // Configure GPS
     ubx_setup();
 }
 
-/**
- * @brief   Configure the GPS module to use UBX protocol exclusively.
- *
- * Sends a UBX configuration message to the GPS module to use UBX protocol only.
- */
-void GTU7::ubx_setup()
-{
+void GTU7::set_configuration() {
     // Send UART configuration
     UBX::Message setupMessage {
             .header {
@@ -34,27 +31,32 @@ void GTU7::ubx_setup()
                 .payload_length { 20 },
             },
             .payload = {
-                    0x01,					    // PORT
-                    0x00,						// Reserved0
-                    0x00, 0x00,					// txReady
-                    0xD0, 0x08, 0x00, 0x00,		// mode
-                    0x00, 0xC2, 0x01, 0x00,		// baudRate
-                    0x01, 0x00,					// inProtoMask
-                    0x01, 0x00,					// outProtoMask
-                    0x00, 0x00,					// reserved4
-                    0x00, 0x00 					// reserved5
+                    0x01,                       // PORT
+                    0x00,                       // Reserved0
+                    0x00, 0x00,                 // txReady
+                    0xD0, 0x08, 0x00, 0x00,     // mode
+                    0x80, 0x25, 0x00, 0x00,     // baudRate
+                    0x01, 0x00,                 // inProtoMask
+                    0x01, 0x00,                 // outProtoMask (change to 0x01 after debugging to remove NMEA)
+                    0x00, 0x00,                 // reserved4
+                    0x00, 0x00                  // reserved5
                     },
     };
     setupMessage.checksum = UBX::compute_checksum(setupMessage);
     if (!write_ubx_message(setupMessage)) {
         return;
     }
-    // Get the ACK
-    UBX::Message ack_message{};
-    while (!read_ubx_message(ack_message, 10)) {
-        HAL_Delay(1000);
-    }
+    HAL_Delay(200);
+    __HAL_UART_FLUSH_DRREGISTER(m_huart_);
 
+    // Get the ACK
+//    UBX::Message ack_message = {};
+//    while (!read_ubx_message(ack_message)) {
+//        HAL_Delay(1000);
+//    }
+}
+
+void GTU7::set_measurement_frequency() {
     // Set Measurement Frequency
     UBX::Message
     setupMeasurementFrequencyMessage {
@@ -69,16 +71,232 @@ void GTU7::ubx_setup()
             0x00, 0x00   // timeRef
         }
     };
-    UBX::compute_checksum(setupMeasurementFrequencyMessage);
+    setupMeasurementFrequencyMessage.checksum =
+            UBX::compute_checksum(setupMeasurementFrequencyMessage);
     if (!write_ubx_message(setupMeasurementFrequencyMessage)) {
         return;
     }
+    HAL_Delay(100);
 
     // Get the ACK
-    ack_message = {};
-    while (!read_ubx_message(ack_message, 10)) {
-        HAL_Delay(1000);
+//    UBX::Message ack_message = {};
+//    while (!read_ubx_message(ack_message)) {
+//        HAL_Delay(1000);
+//    }
+}
+
+void GTU7::set_posllh() {
+    // Enable POSLLH
+    UBX::Message
+        enablePosllh {
+            .header {
+                .msg_class { UBX::Msg_class::cfg },
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                    static_cast<uint8_t>(UBX::Msg_class::nav),
+                    UBX::nav_posllh,
+                    0x00,                                      // rateDDC
+                    0x01,                                      // rateUART
+                    0x00,                                      // rateUSB
+                    0x00,                                      // rateSPI
+                    0x00,                                      // reserved
+                    0x00                                       // reserved
+            }
+    };
+    enablePosllh.checksum = UBX::compute_checksum(enablePosllh);
+    if (!write_ubx_message(enablePosllh)) {
+        return;
     }
+    HAL_Delay(100);
+}
+
+
+void GTU7::disable_nmea()
+{
+    // Disable NMEA (GGA, GLL, GSA, GSV, RMC, VTG, TXT )
+    UBX::Message
+        disableGGA {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableGGA.checksum = UBX::compute_checksum(disableGGA);
+    if (!write_ubx_message(disableGGA)) {
+        return;
+    }
+    HAL_Delay(100);
+
+    UBX::Message
+        disableGLL {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x01,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableGLL.checksum = UBX::compute_checksum(disableGLL);
+    if (!write_ubx_message(disableGLL)) {
+        return;
+    }
+    HAL_Delay(100);
+
+    UBX::Message
+        disableGSA {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x02,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableGSA.checksum = UBX::compute_checksum(disableGSA);
+    if (!write_ubx_message(disableGSA)) {
+        return;
+    }
+    HAL_Delay(100);
+
+    UBX::Message
+        disableGSV {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x03,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableGSV.checksum = UBX::compute_checksum(disableGSV);
+    if (!write_ubx_message(disableGSV)) {
+        return;
+    }
+    HAL_Delay(1000);
+
+    UBX::Message
+        disableRMC {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x04,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableRMC.checksum = UBX::compute_checksum(disableRMC);
+    if (!write_ubx_message(disableRMC)) {
+        return;
+    }
+    HAL_Delay(100);
+
+    UBX::Message
+        disableVTG {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x05,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableVTG.checksum = UBX::compute_checksum(disableVTG);
+    if (!write_ubx_message(disableVTG)) {
+        return;
+    }
+    HAL_Delay(100);
+
+    UBX::Message
+        disableTXT {
+            .header {
+                .msg_class{ UBX::Msg_class::cfg},
+                .msg_id { UBX::cfg_msg },
+                .payload_length { 8 },
+            },
+            .payload = {
+                0xF0,
+                0x41,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            }
+    };
+    disableTXT.checksum = UBX::compute_checksum(disableTXT);
+    if (!write_ubx_message(disableTXT)) {
+        return;
+    }
+    HAL_Delay(100);
+}
+
+/**
+ * @brief   Configure the GPS module to use UBX protocol exclusively.
+ *
+ * Sends a UBX configuration message to the GPS module to use UBX protocol only.
+ */
+void GTU7::ubx_setup()
+{
+    __HAL_UART_FLUSH_DRREGISTER(m_huart_);
+    HAL_Delay(100);
+
+    set_configuration();
+    set_measurement_frequency();
+    set_posllh();
+    disable_nmea();
+
+    // Give GPS time to stop sending NMEA
+    HAL_Delay(500);
+    __HAL_UART_FLUSH_DRREGISTER(m_huart_);
+    HAL_Delay(100);
+}
+
+/**
+ * @brief   Wait for ACK/NACK
+ */
+bool GTU7::wait_for_ack(uint8_t msg_id, uint32_t timeout_ms)
+{
+    uint32_t start = HAL_GetTick();
+    UBX::Message ack_message{};
+
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        if (read_ubx_message(ack_message)) {
+            if (ack_message.header.msg_class == UBX::Msg_class::ack &&
+                    ack_message.header.msg_id == UBX::ack_ack &&
+                    ack_message.payload[1] == msg_id) {
+                return true;
+            }
+
+            if (ack_message.header.msg_class == UBX::Msg_class::ack &&
+                    ack_message.header.msg_id == UBX::ack_nak &&
+                    ack_message.payload[1] == msg_id) {
+                return true;
+            }
+        }
+        HAL_Delay(10);
+    }
+
+    return false;
 }
 
 /**
@@ -86,7 +304,7 @@ void GTU7::ubx_setup()
  *
  * @return  true if the message was successfully written, false otherwise.
  */
-bool GTU7::write_ubx_message(UBX::Message &message) const
+bool GTU7::write_ubx_message(const UBX::Message& message) const
 {
     std::vector < uint8_t > tempBuf;
     tempBuf.reserve(8 + message.header.payload_length);
@@ -116,42 +334,48 @@ bool GTU7::write_ubx_message(UBX::Message &message) const
  *
  * @return  The read UBX message.
  */
-bool GTU7::read_ubx_message(UBX::Message& message, uint16_t messageSize)
+bool GTU7::read_ubx_message(UBX::Message& message)
 {
+    // Read the sync bytes (sync 1, sync 2)
+    uint8_t sync_byte;
+    auto status = HAL_UART_Receive(m_huart_, &sync_byte, 1, default_timeout);
+    if (status != HAL_OK || sync_byte != UBX::sync_char_1) {
+        return false;
+    }
 
-    // Read the Header (6 Bytes) (sync 1, sync 2, msgClass, msgID, length (2 bytes))
+    status = HAL_UART_Receive(m_huart_, &sync_byte, 1, default_timeout);
+    if (status != HAL_OK || sync_byte != UBX::sync_char_2) {
+        return false;
+    }
+
+    // Read the Header (4 Bytes) (msgClass, msgID, length (2 bytes))
+    uint8_t header[4];
+    status = HAL_UART_Receive(m_huart_, header, header_bytes, default_timeout);
+    if (status != HAL_OK) {
+        return false;
+    }
+    message.header.msg_class = static_cast<UBX::Msg_class>(header[0]);
+    message.header.msg_id = header[1];
+    message.header.payload_length = (header[3] << byte_shift_amount | header[2]);
+
+
     // Read the payload based on length
-    // Read the checksum
-    // Verify the checksum
-    std::vector<uint8_t> buffer(messageSize);
-    auto status = HAL_UART_Receive(m_huart_, buffer.data(), messageSize, default_timeout);
+    message.payload.resize(message.header.payload_length);
+    status = HAL_UART_Receive(m_huart_, message.payload.data(), message.header.payload_length, default_timeout);
     if (status != HAL_OK) {
         return false;
     }
 
-    if (buffer[0] == UBX::sync_char_1 && buffer[1] == UBX::sync_char_2) {
-        message.header.msg_class = static_cast<UBX::Msg_class>(buffer[2]);
-        message.header.msg_id = buffer[3];
-
-        message.header.payload_length = (buffer[5] << byte_shift_amount | buffer[4]);
-        if (message.header.payload_length + 8 != messageSize) {
-            return false;
-        }
-
-        uint8_t payload_offset = 6;
-        message.payload.resize(message.header.payload_length);
-        std::copy(buffer.begin() + payload_offset,
-                buffer.begin() + payload_offset + message.header.payload_length,
-                message.payload.begin());
-
-        size_t checksum_index = 6 + message.header.payload_length;
-        message.checksum = {
-            buffer[checksum_index],
-            buffer[checksum_index + 1]
-        };
-        if (compute_checksum(message) == message.checksum) {
-            return true;
-        }
+    // Read the checksum and verify
+    uint8_t checksum[2];
+    status = HAL_UART_Receive(m_huart_, checksum, checksum_bytes, default_timeout);
+    if (status != HAL_OK) {
+        return false;
+    }
+    message.checksum.a = checksum[0];
+    message.checksum.b = checksum[1];
+    if (message.checksum == compute_checksum(message)) {
+        return true;
     }
 
     return false;
@@ -165,24 +389,21 @@ bool GTU7::read_ubx_message(UBX::Message& message, uint16_t messageSize)
  */
 PVT_data GTU7::get_pvt()
 {
-    // First send a request
-    UBX::Message requestPosllh {
-        .header {
-            .msg_class { UBX::Msg_class::nav },
-            .msg_id { UBX::nav_posllh },
-            .payload_length { 0 },
-        },
-        .payload = {}
-    };
-    UBX::compute_checksum(requestPosllh);
-    if (!write_ubx_message(requestPosllh)) {
-        return pvtData_;
-    }
-
     // Now read the data
     // TODO: Add 8 to default message size then add payload
+    std::vector<uint8_t> buff;
+    while (UART4->ISR & USART_ISR_RXNE)  {
+        uint8_t byte = static_cast<uint8_t>(UART4->RDR);
+        buff.push_back(byte);
+    }
+
     UBX::Message message{};
-    if (read_ubx_message(message, 8 + 28)) {
+    if (read_ubx_message(message)) {
+        if (message.header.msg_class != UBX::Msg_class::nav ||
+            message.header.msg_id    != UBX::nav_posllh ||
+            message.header.payload_length < 20) {
+            return pvtData_;
+        }
 
 //        uint32_t iTOW = u4_to_int(std::span<const uint8_t, 4>(&message.payload[0], 4));
         // Extract longitude and latitude in degrees
@@ -201,64 +422,4 @@ PVT_data GTU7::get_pvt()
     }
 
     return pvtData_;
-}
-
-/**
- * @brief   Convert a little-endian byte array to a signed 16-bit integer.
- *
- * @param   little_endian_bytes The input byte array.
- * @return  The converted signed 16-bit integer.
- */
-int16_t GTU7::i2_to_int(std::span<const uint8_t, 2> bytes)
-{
-    auto byte0 = static_cast<uint16_t>(bytes[0]);
-    auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
-
-    return static_cast<int16_t>(byte1 | byte0);
-}
-
-/**
- * @brief   Convert a little-endian byte array to an unsigned 16-bit integer.
- *
- * @param   little_endian_bytes The input byte array.
- * @return  The converted unsigned 16-bit integer.
- */
-uint16_t GTU7::u2_to_int(std::span<const uint8_t, 2> bytes)
-{
-    auto byte0 = static_cast<uint16_t>(bytes[0]);
-    auto byte1 = static_cast<uint16_t>(bytes[1]) << byte_shift_amount;
-
-    return byte1 | byte0;
-}
-
-/**
- * @brief   Convert a little-endian byte array to a signed 32-bit integer.
- *
- * @param   little_endian_bytes The input byte array.
- * @return  The converted signed 32-bit integer.
- */
-int32_t GTU7::i4_to_int(std::span<const uint8_t, 4> bytes)
-{
-    auto byte0 = static_cast<uint32_t>(bytes[0]);
-    auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;
-    auto byte2 = static_cast<uint32_t>(bytes[2]) << half_word_shift_amount;
-    auto byte3 = static_cast<uint32_t>(bytes[3]) << three_byte_shift_amount;
-
-    return static_cast<int32_t>(byte3 | byte2 | byte1 | byte0);
-}
-
-/**
- * @brief   Convert a little-endian byte array to an unsigned 32-bit integer.
- *
- * @param   little_endian_bytes The input byte array.
- * @return  The converted unsigned 32-bit integer.
- */
-uint32_t GTU7::u4_to_int(std::span<const uint8_t, 4> bytes)
-{
-    auto byte0 = static_cast<uint32_t>(bytes[0]);
-    auto byte1 = static_cast<uint32_t>(bytes[1]) << byte_shift_amount;
-    auto byte2 = static_cast<uint32_t>(bytes[2]) << half_word_shift_amount;
-    auto byte3 = static_cast<uint32_t>(bytes[3]) << three_byte_shift_amount;
-
-    return (byte3 | byte2 | byte1 | byte0);
 }

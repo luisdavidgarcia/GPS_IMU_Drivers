@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "app.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +55,7 @@ static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
-void DMA_Receive_Complete(DMA_HandleTypeDef* hdma);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,9 +96,7 @@ int main(void)
   MX_I2C1_Init();
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
-	HAL_DMA_RegisterCallback(&hdma_uart4_rx, HAL_DMA_XFER_CPLT_CB_ID, 
-		&DMA_Receive_Complete);
-  C_app_main(&hi2c1, &huart4, &hdma_uart4_rx);
+  C_app_main(&hi2c1, &huart4);
   /* USER CODE END 2 */
 
   /* Infinite loop */

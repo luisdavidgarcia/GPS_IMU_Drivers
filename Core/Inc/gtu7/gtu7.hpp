@@ -25,7 +25,7 @@ extern "C"
 #include <cstring>
 #include <cstdio>
 
-struct alignas(128) PVT_data
+struct alignas(128) Polssh
 {
     // Time Information
     uint16_t year;                        // Year (UTC)
@@ -78,11 +78,10 @@ class GTU7
 {
 public:
     explicit GTU7(UART_HandleTypeDef *huart);
-    PVT_data get_pvt();
+    bool get_posllh(Polssh& data, uint8_t* buffer, size_t buffer_size);
 
 private:
     UART_HandleTypeDef *m_huart_;
-    PVT_data pvtData_;
 
     void ubx_setup();
     void set_configuration();

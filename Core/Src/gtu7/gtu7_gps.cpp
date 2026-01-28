@@ -12,7 +12,7 @@
  * Initializes the GPS module communication, sets message send rates, and measurement frequencies.
  */
 GTU7::GTU7(UART_HandleTypeDef *huart)
-        : m_huart_(huart), pvtData_ {}
+        : m_huart_(huart)
 {
     // Enable UART here for GPS
     // Set baud_rate, message rate, measurement frequency
@@ -387,39 +387,66 @@ bool GTU7::read_ubx_message(UBX::Message& message)
  *
  * @return  The PVTData structure containing GPS-related information.
  */
-PVT_data GTU7::get_pvt()
+bool GTU7::get_posllh(Polssh& data, uint8_t* buffer, size_t buffer_size)
 {
-    // Now read the data
-    // TODO: Add 8 to default message size then add payload
-    std::vector<uint8_t> buff;
-    while (UART4->ISR & USART_ISR_RXNE)  {
-        uint8_t byte = static_cast<uint8_t>(UART4->RDR);
-        buff.push_back(byte);
-    }
-
-    UBX::Message message{};
-    if (read_ubx_message(message)) {
-        if (message.header.msg_class != UBX::Msg_class::nav ||
-            message.header.msg_id    != UBX::nav_posllh ||
-            message.header.payload_length < 20) {
-            return pvtData_;
+    size_t start = 0;
+    while (start < buffer_size) {
+        if (buffer[start] == UBX::sync_char_1 &&
+                start + 1 < buffer_size &&
+                buffer[start + 1] == UBX::sync_char_2) {
+            start += 2;
+            break;
         }
-
-//        uint32_t iTOW = u4_to_int(std::span<const uint8_t, 4>(&message.payload[0], 4));
-        // Extract longitude and latitude in degrees
-        pvtData_.longitude = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[4], 4)))
-                * longtitude_scale;
-        pvtData_.latitude = static_cast<float>(i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[8], 4)))
-                * lattitude_scale;
-        pvtData_.height = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[12], 4));
-        pvtData_.heightMSL = i4_to_int(
-                std::span<const uint8_t, 4>(&message.payload[16], 4));
-
-        return pvtData_;
+        ++start;
     }
 
-    return pvtData_;
+    if (start >= buffer_size) {
+        return false;
+    }
+
+    constexpr size_t needed_packet_size{36};
+    if (start + needed_packet_size > buffer_size) {
+        return false;
+    }
+
+    // Read the header
+    UBX::Message message{};
+    message.header.msg_class = static_cast<UBX::Msg_class>(buffer[start++]);
+    message.header.msg_id = buffer[start++];
+    uint8_t lower = buffer[start++];
+    uint8_t upper = buffer[start++];
+    message.header.payload_length = (upper << byte_shift_amount | lower);
+    if (message.header.msg_class != UBX::Msg_class::nav ||
+            message.header.msg_id != UBX::nav_posllh ||
+            message.header.payload_length != 28) {
+        return false;
+    }
+    // Read the payload
+    int payload_start = 0;
+    while (payload_start < message.header.payload_length) {
+        message.payload.push_back(buffer[start++]);
+        payload_start++;
+    }
+    // Read the checksum
+    message.checksum.a = buffer[start++];
+    message.checksum.b = buffer[start++];
+    // Verify the checksum
+    if (message.checksum != compute_checksum(message)) {
+        return false;
+    }
+
+//  uint32_t iTOW = u4_to_int(std::span<const uint8_t, 4>(&message.payload[0], 4));
+    // Extract longitude and latitude in degrees
+    data.longitude = static_cast<float>(i4_to_int(
+            std::span<const uint8_t, 4>(&message.payload[4], 4)))
+            * longtitude_scale;
+    data.latitude = static_cast<float>(i4_to_int(
+            std::span<const uint8_t, 4>(&message.payload[8], 4)))
+            * lattitude_scale;
+    data.height = i4_to_int(
+            std::span<const uint8_t, 4>(&message.payload[12], 4));
+    data.heightMSL = i4_to_int(
+            std::span<const uint8_t, 4>(&message.payload[16], 4));
+
+    return true;
 }
